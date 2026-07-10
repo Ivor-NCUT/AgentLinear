@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>Agent Linear · 多线程 AI 协作看板</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --surface-soft: #f8f9fa;
+      --ink: #202124;
+      --muted: #72767f;
+      --faint: #a7abb2;
+      --line: #e4e6ea;
+      --line-strong: #d7d9de;
+      --accent: #5e6ad2;
+      --accent-soft: #eef0ff;
+      --green: #2e8b64;
+      --green-soft: #eaf7f0;
+      --amber: #a86f13;
+      --amber-soft: #fff6df;
+      --red: #c44848;
+      --red-soft: #fff0f0;
+      --radius-card: 12px;
+      --radius-control: 8px;
+      --shadow-panel: 0 24px 70px rgba(25, 28, 38, 0.16), 0 2px 8px rgba(25, 28, 38, 0.06);
+      --shadow-card: 0 1px 2px rgba(25, 28, 38, 0.04);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    button, textarea, input { font: inherit; }
+
+    button { color: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 228px minmax(0, 1fr);
+      min-height: 100dvh;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      padding: 18px 14px 14px;
+      background: #eceef1;
+      border-right: 1px solid var(--line-strong);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 38px;
+      padding: 0 8px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--accent);
+      box-shadow: 0 4px 14px rgba(94, 106, 210, 0.28);
+    }
+
+    .brand-mark svg { width: 15px; height: 15px; }
+
+    .workspace-switcher {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin: 13px 0 16px;
+      padding: 9px 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-control);
+      background: rgba(255, 255, 255, 0.62);
+      cursor: pointer;
+    }
+
+    .workspace-switcher:active, .btn:active, .nav-item:active { transform: translateY(1px); }
+
+    .workspace-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .workspace-avatar { width: 21px; height: 21px; border-radius: 6px; background: #202124; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+    .workspace-name span:last-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 600; }
+
+    .nav-section { margin: 6px 0 14px; }
+    .nav-label { padding: 0 10px 6px; color: var(--faint); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      height: 34px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 7px;
+      color: #646871;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .nav-item:hover { color: var(--ink); background: rgba(255,255,255,.54); }
+    .nav-item.active { color: var(--ink); background: var(--surface); box-shadow: var(--shadow-card); font-weight: 600; }
+    .nav-item svg { width: 16px; height: 16px; flex: 0 0 auto; }
+    .nav-count { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .nav-count.live { color: var(--accent); font-weight: 700; }
+
+    .sidebar-spacer { flex: 1; }
+
+    .resource-meter {
+      padding: 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-card);
+      background: rgba(255,255,255,.58);
+    }
+
+    .resource-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+    .resource-row strong { font-size: 12px; }
+    .resource-row span { color: var(--muted); font-size: 11px; }
+    .meter { height: 5px; overflow: hidden; border-radius: 999px; background: #dfe1e5; }
+    .meter > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--accent); transition: width .25s ease; }
+    .resource-note { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+    .main { min-width: 0; display: flex; flex-direction: column; min-height: 100dvh; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-height: 64px;
+      padding: 0 24px;
+      background: rgba(255,255,255,.82);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+      z-index: 5;
+    }
+
+    .title-block { min-width: 180px; }
+    .title-block h1 { margin: 0; font-size: 16px; letter-spacing: -0.02em; }
+    .title-block p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+
+    .topbar-center { flex: 1; display: flex; justify-content: center; }
+
+    .capacity-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 11px;
+      border: 1px solid #dfe1f7;
+      border-radius: 999px;
+      color: #535db8;
+      background: var(--accent-soft);
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(94,106,210,.12); animation: breathe 1.8s ease-in-out infinite; }
+    @keyframes breathe { 50% { box-shadow: 0 0 0 7px rgba(94,106,210,0); } }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-control);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+      transition: background .15s, border .15s, transform .08s;
+    }
+
+    .btn:hover { background: #f8f8fa; border-color: #c9ccd2; }
+    .btn.primary { color: #fff; border-color: var(--accent); background: var(--accent); }
+    .btn.primary:hover { background: #525fc9; }
+    .btn.danger { color: var(--red); border-color: #efd2d2; background: var(--red-soft); }
+    .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+    .btn svg { width: 15px; height: 15px; }
+
+    .board-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px 0;
+    }
+
+    .board-context { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+    .board-context svg { width: 14px; height: 14px; }
+    .toolbar-spacer { flex: 1; }
+    .toolbar-note { color: var(--muted); font-size: 12px; }
+
+    .board-wrap { min-height: 0; flex: 1; overflow: auto; padding: 14px 24px 28px; }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(280px, 1fr));
+      gap: 14px;
+      min-width: 1200px;
+      align-items: start;
+    }
+
+    .column { min-width: 0; }
+
+    .column-head {
+      min-height: 74px;
+      padding: 10px 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      background: rgba(255,255,255,.58);
+      margin-bottom: 9px;
+    }
+
+    .group-head-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #5d616a;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .group-icon { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 7px; color: var(--group-color, var(--accent)); background: color-mix(in srgb, var(--group-color, var(--accent)) 12%, white); }
+    .group-icon svg { width: 14px; height: 14px; }
+    .group-title { color: var(--ink); font-size: 13px; letter-spacing: -.01em; }
+    .group-path { display: flex; align-items: center; gap: 5px; min-width: 0; margin: 8px 0 0 33px; color: var(--faint); font-size: 10px; }
+    .group-path svg { width: 11px; height: 11px; flex: 0 0 auto; }
+    .group-path span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .group-menu { margin-left: auto; display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; color: var(--faint); background: transparent; cursor: pointer; }
+    .group-menu:hover { color: var(--ink); background: #eceef1; }
+
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #aeb2ba; }
+    .status-dot.running { background: var(--accent); box-shadow: 0 0 0 3px rgba(94,106,210,.12); }
+    .status-dot.queued { border: 2px solid #d08a1b; background: transparent; }
+    .status-dot.done { background: var(--green); }
+    .column-count { min-width: 20px; padding: 1px 6px; border-radius: 999px; color: var(--muted); background: #e5e7ea; font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
+    .column-meta { margin-left: auto; color: var(--faint); font-weight: 500; }
+
+    .card-list { display: flex; flex-direction: column; gap: 9px; min-height: 80px; }
+
+    .add-task-card {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+      min-height: 38px;
+      margin-top: 2px;
+      border: 1px dashed #cfd2d8;
+      border-radius: var(--radius-card);
+      color: var(--muted);
+      background: rgba(255,255,255,.38);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 650;
+    }
+    .add-task-card:hover { color: var(--group-color, var(--accent)); border-color: var(--group-color, var(--accent)); background: var(--surface); }
+    .add-task-card svg { width: 14px; height: 14px; }
+
+    .task-card {
+      position: relative;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+      box-shadow: var(--shadow-card);
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, opacity .2s;
+      overflow: hidden;
+    }
+
+    .task-card:hover { transform: translateY(-1px); border-color: #cfd2d8; box-shadow: 0 7px 20px rgba(25,28,38,.07); }
+    .task-card.running { background: #fbfbfd; }
+    .task-card.queued { background: #fffdf8; }
+    .task-card.canceled { opacity: .68; }
+    .task-card.just-completed { border-color: #73b798; animation: completedGlow 2.2s ease-in-out infinite; }
+
+    @keyframes completedGlow {
+      50% { box-shadow: 0 0 0 4px rgba(46,139,100,.12), 0 8px 22px rgba(46,139,100,.12); }
+    }
+
+    .running-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+
+    .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+    .card-id { color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+    .status-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+    .status-chip.running { color: #535db8; background: var(--accent-soft); }
+    .status-chip.queued { color: var(--amber); background: var(--amber-soft); }
+    .status-chip.done { color: var(--green); background: var(--green-soft); }
+    .status-chip.canceled { color: var(--red); background: var(--red-soft); }
+    .chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .card-time { margin-left: auto; color: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+    .task-card h3 { margin: 0 0 8px; font-size: 13px; line-height: 1.42; letter-spacing: -0.012em; }
+    .task-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.52; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    .card-progress { height: 3px; margin: 12px 0 10px; overflow: hidden; border-radius: 999px; background: #e7e8ec; }
+    .card-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s; }
+    .task-card.queued .card-progress span { background: #d08a1b; }
+
+    .card-footer { display: flex; align-items: center; gap: 7px; margin-top: 12px; }
+    .repo-badge { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: var(--muted); font-size: 10px; }
+    .repo-badge svg { width: 12px; height: 12px; flex: 0 0 auto; }
+    .repo-badge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .turn-count { margin-left: auto; color: var(--faint); font-size: 10px; white-space: nowrap; }
+
+    .queue-index { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 6px; color: var(--amber); background: var(--amber-soft); font-size: 10px; font-weight: 800; }
+
+    .drawer-scrim { position: fixed; inset: 0; background: rgba(26,28,33,.16); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
+    .drawer-scrim.open { opacity: 1; pointer-events: auto; }
+
+    .drawer {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      bottom: 10px;
+      width: min(530px, calc(100vw - 20px));
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow-panel);
+      transform: translateX(calc(100% + 28px));
+      transition: transform .24s cubic-bezier(.2,.8,.2,1);
+      z-index: 21;
+      overflow: hidden;
+    }
+
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head { padding: 17px 18px 14px; border-bottom: 1px solid var(--line); }
+    .drawer-head-top { display: flex; align-items: center; gap: 8px; }
+    .icon-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); cursor: pointer; }
+    .icon-btn:hover { background: var(--surface-soft); }
+    .icon-btn svg { width: 15px; height: 15px; }
+    .drawer-actions { margin-left: auto; display: flex; gap: 7px; }
+    .drawer-title { margin: 14px 0 7px; font-size: 20px; line-height: 1.3; letter-spacing: -0.025em; }
+    .drawer-submeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--muted); font-size: 11px; }
+    .drawer-submeta span { display: inline-flex; align-items: center; gap: 5px; }
+
+    .conversation { flex: 1; min-height: 0; overflow: auto; padding: 22px 20px 24px; background: #fafafa; }
+    .message { display: flex; gap: 10px; margin: 0 auto 18px; max-width: 470px; }
+    .message.user { flex-direction: row-reverse; }
+    .avatar { flex: 0 0 auto; display: grid; place-items: center; width: 27px; height: 27px; border-radius: 8px; color: #fff; background: #202124; font-size: 10px; font-weight: 750; }
+    .message.agent .avatar { color: var(--accent); background: var(--accent-soft); }
+    .bubble { max-width: 82%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 5px 12px 12px 12px; background: var(--surface); font-size: 12px; line-height: 1.62; box-shadow: var(--shadow-card); }
+    .message.user .bubble { color: #fff; border-color: #34363b; border-radius: 12px 5px 12px 12px; background: #34363b; }
+    .bubble p { margin: 0 0 8px; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble code { padding: 1px 4px; border-radius: 4px; background: #f0f1f3; color: #3e4658; font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; }
+    .message.user .bubble code { background: rgba(255,255,255,.12); color: #fff; }
+    .message-time { margin-top: 6px; color: var(--faint); font-size: 9px; }
+    .message.user .message-time { color: #c6c8cd; text-align: right; }
+
+    .execution-placeholder { max-width: 470px; margin: 10px auto; padding: 16px; border: 1px dashed #d4d6dc; border-radius: var(--radius-card); color: var(--muted); background: rgba(255,255,255,.75); text-align: center; }
+    .execution-placeholder strong { display: block; color: var(--ink); font-size: 12px; margin-bottom: 5px; }
+    .quiet-bars { display: flex; justify-content: center; gap: 3px; height: 14px; margin-bottom: 10px; align-items: center; }
+    .quiet-bars i { display: block; width: 3px; height: 7px; border-radius: 999px; background: var(--accent); animation: bars 1.1s ease-in-out infinite; }
+    .quiet-bars i:nth-child(2) { animation-delay: .12s; }
+    .quiet-bars i:nth-child(3) { animation-delay: .24s; }
+    @keyframes bars { 50% { height: 14px; opacity: .55; } }
+
+    .composer { padding: 13px 16px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+    .composer-box { padding: 10px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--surface); transition: border .15s, box-shadow .15s; }
+    .composer-box:focus-within { border-color: #a7ace5; box-shadow: 0 0 0 3px rgba(94,106,210,.1); }
+    .composer textarea { width: 100%; min-height: 62px; max-height: 140px; resize: vertical; padding: 2px; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; line-height: 1.5; }
+    .composer textarea::placeholder { color: #91959d; }
+    .composer-footer { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .context-note { color: var(--muted); font-size: 10px; }
+    .composer-footer .btn { margin-left: auto; }
+
+    .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+    .attach-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: var(--surface-soft); cursor: pointer; font-size: 10px; font-weight: 650; }
+    .attach-button:hover { color: var(--accent); border-color: #bfc4ed; background: var(--accent-soft); }
+    .attach-button svg { width: 13px; height: 13px; }
+    .attachment-tray { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .attachment-tray:empty { display: none; }
+    .attachment-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; color: #5f646d; background: #f4f5f7; font-size: 10px; }
+    .attachment-chip svg { width: 12px; height: 12px; flex: 0 0 auto; color: var(--accent); }
+    .attachment-chip-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .attachment-size { color: var(--faint); }
+    .attachment-remove { display: grid; place-items: center; width: 15px; height: 15px; padding: 0; border: 0; border-radius: 4px; color: var(--faint); background: transparent; cursor: pointer; }
+    .attachment-remove:hover { color: var(--red); background: var(--red-soft); }
+    .field-attachment-row { display: flex; align-items: center; gap: 9px; margin-top: 1px; }
+    .attachment-helper { color: var(--faint); font-size: 10px; }
+    .message-attachments { display: grid; gap: 5px; margin-top: 9px; }
+    .message-file { display: flex; align-items: center; gap: 7px; min-width: 180px; padding: 7px 8px; border: 1px solid #e2e4e8; border-radius: 7px; color: #4f545d; background: #f7f8f9; }
+    .message-file svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--accent); }
+    .message-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .message.user .message-file { color: #fff; border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.08); }
+    .message.user .message-file svg { color: #cdd1ff; }
+    .message.user .attachment-size { margin-left: auto; color: #c6c8cd; }
+
+    .modal-scrim { position: fixed; inset: 0; display: none; place-items: center; padding: 20px; background: rgba(26,28,33,.24); z-index: 30; }
+    .modal-scrim.open { display: grid; }
+    .modal { width: min(520px, 100%); padding: 20px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-panel); }
+    .modal h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+    .modal > p { margin: 6px 0 18px; color: var(--muted); font-size: 12px; }
+    .field { display: grid; gap: 7px; margin-bottom: 13px; }
+    .field label { font-size: 11px; font-weight: 700; }
+    .field input, .field textarea { width: 100%; padding: 10px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); outline: 0; background: var(--surface); }
+    .field textarea { min-height: 100px; resize: vertical; }
+    .field input:focus, .field textarea:focus { border-color: #a7ace5; box-shadow: 0 0 0 3px rgba(94,106,210,.1); }
+    .field-note { margin-top: -2px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .path-preview { display: flex; align-items: center; gap: 7px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--muted); background: var(--surface-soft); font-family: "SFMono-Regular", Consolas, monospace; font-size: 10px; }
+    .path-preview svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--accent); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+    .toast-stack { position: fixed; right: 22px; bottom: 22px; display: grid; gap: 8px; z-index: 50; pointer-events: none; }
+    .toast { min-width: 290px; max-width: 380px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: #25272b; color: #fff; box-shadow: var(--shadow-panel); animation: toastIn .22s ease both; }
+    .toast strong { display: block; margin-bottom: 3px; font-size: 12px; }
+    .toast span { color: #c8cbd0; font-size: 11px; }
+    @keyframes toastIn { from { transform: translateY(8px); opacity: 0; } }
+
+    .empty-column { padding: 22px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-card); color: var(--faint); text-align: center; font-size: 11px; }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 64px minmax(0,1fr); }
+      .sidebar { padding: 14px 9px; align-items: center; }
+      .brand { padding: 0; }
+      .brand > span:last-child, .workspace-switcher, .nav-label, .nav-item span:not(.nav-count), .resource-meter { display: none; }
+      .nav-section { width: 100%; }
+      .nav-item { justify-content: center; padding: 0; }
+      .nav-count { position: absolute; transform: translate(12px,-10px); width: 15px; height: 15px; display: grid; place-items: center; border-radius: 999px; color: #fff; background: var(--accent); font-size: 8px; }
+      .topbar-center { display: none; }
+      .title-block { min-width: 0; flex: 1; }
+      .toolbar-note { display: none; }
+    }
+
+    @media (max-width: 620px) {
+      body { overflow: auto; }
+      .app { display: block; }
+      .sidebar { display: none; }
+      .topbar { position: sticky; top: 0; min-height: 58px; padding: 0 14px; }
+      .title-block p { display: none; }
+      .board-toolbar { padding: 10px 14px 0; }
+      .board-wrap { padding: 12px 14px 22px; }
+      .board { min-width: 0; grid-template-columns: 1fr; }
+      .column { min-width: 0; }
+      .drawer { inset: 0; width: 100%; border: 0; border-radius: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6h12M6 12h8M6 18h4" stroke-linecap="round"/></svg>
+        </span>
+        <span>Agent Linear</span>
+      </div>
+
+      <button class="workspace-switcher" type="button">
+        <span class="workspace-name"><span class="workspace-avatar">F</span><span>泛函的本地工作区</span></span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+
+      <nav class="nav-section" aria-label="主导航">
+        <div class="nav-label">Workspace</div>
+        <button class="nav-item active" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8v8M16 8v8"/></svg>
+          <span>任务看板</span><span class="nav-count" id="allCount">14</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+      <div class="resource-meter">
+        <div class="resource-row"><strong>并发容量</strong><span id="capacityText">6 / 6</span></div>
+        <div class="meter"><span id="capacityBar"></span></div>
+        <div class="resource-note">达到上限。新任务会进入队列，并按创建顺序自动递补。</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="title-block">
+          <h1>任务看板</h1>
+          <p>本地 Codex 会话 · 自动持久化</p>
+        </div>
+        <div class="topbar-center">
+          <div class="capacity-pill"><span class="live-dot"></span><span id="capacityPill">6 个 Agent 正在工作 · 4 个等待</span></div>
+        </div>
+      </header>
+
+      <div class="board-toolbar">
+        <div class="board-context">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h7l2 2h9v10H3z"/><path d="M3 7V5h7l2 2"/></svg>
+          <span>4 个 Session 分组 · 每组关联一个本地文件夹</span>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <span class="toolbar-note">单击卡片查看会话 · 状态变更自动保存</span>
+      </div>
+
+      <div class="board-wrap">
+        <section class="board" id="sessionBoard" aria-label="Session 分组看板"></section>
+      </div>
+    </main>
+  </div>
+
+  <div class="drawer-scrim" id="drawerScrim"></div>
+  <aside class="drawer" id="taskDrawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div class="drawer-head-top">
+        <button class="icon-btn" id="closeDrawer" type="button" aria-label="关闭详情">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 6-6 6 6 6"/></svg>
+        </button>
+        <span class="card-id" id="drawerId">AGT-1042</span>
+        <span class="status-chip running" id="drawerStatus"><span class="chip-dot"></span>运行中</span>
+        <div class="drawer-actions">
+          <button class="btn danger" id="stopTask" type="button">停止任务</button>
+        </div>
+      </div>
+      <h2 class="drawer-title" id="drawerTitle">重构用户权限中间件</h2>
+      <div class="drawer-submeta" id="drawerMeta"></div>
+    </div>
+    <div class="conversation" id="conversation"></div>
+    <div class="composer">
+      <div class="composer-box">
+        <textarea id="followupInput" aria-label="补充指令" placeholder="补充要求，Agent 会延续这张卡片的完整上下文……"></textarea>
+        <div class="attachment-tray" id="followupAttachmentTray"></div>
+        <div class="composer-footer">
+          <label class="attach-button" for="followupFileInput">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 12 5.5-5.5a3 3 0 0 1 4.2 4.2L10 18.4a5 5 0 0 1-7.1-7.1l8-8"/></svg>
+            添加文件
+          </label>
+          <input class="file-input" id="followupFileInput" type="file" multiple />
+          <span class="context-note" id="contextNote">已载入 2 轮上下文</span>
+          <button class="btn primary" id="continueTask" type="button">继续</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="modal-scrim" id="newTaskModal">
+    <form class="modal" id="newTaskForm">
+      <h2>新建 AI 任务</h2>
+      <p>每张卡片对应一个独立、可持续续聊的本地 Codex 会话。</p>
+      <input id="taskGroupId" type="hidden" value="commerce" />
+      <div class="field">
+        <label for="taskGroupInput">Session 分组</label>
+        <input id="taskGroupInput" value="Commerce Platform" readonly />
+      </div>
+      <div class="field">
+        <label for="taskTitleInput">任务标题</label>
+        <input id="taskTitleInput" required maxlength="60" value="检查支付模块的并发安全" />
+      </div>
+      <div class="field">
+        <label for="taskPromptInput">第一条指令</label>
+        <textarea id="taskPromptInput" required>请审查 payment 模块的并发写入逻辑，定位可能导致重复扣款的竞态条件，并给出修复。</textarea>
+        <div class="field-attachment-row">
+          <label class="attach-button" for="taskFileInput">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 12 5.5-5.5a3 3 0 0 1 4.2 4.2L10 18.4a5 5 0 0 1-7.1-7.1l8-8"/></svg>
+            添加本地文件
+          </label>
+          <span class="attachment-helper">可多选，文件会随本轮指令发送</span>
+          <input class="file-input" id="taskFileInput" type="file" multiple />
+        </div>
+        <div class="attachment-tray" id="taskAttachmentTray"></div>
+      </div>
+      <div class="field">
+        <label for="taskRepoInput">关联的本地文件夹</label>
+        <input id="taskRepoInput" value="~/Projects/commerce-platform" readonly />
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelNewTask" type="button">取消</button>
+        <button class="btn primary" type="submit">创建并运行</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal-scrim" id="editGroupModal">
+    <form class="modal" id="editGroupForm">
+      <h2>重命名本地分组</h2>
+      <p>分组名称来自本地文件夹。保存后，两者会一起更新。</p>
+      <input id="editGroupId" type="hidden" />
+      <div class="field">
+        <label for="editGroupName">分组与文件夹名称</label>
+        <input id="editGroupName" required maxlength="80" pattern="[^/\\]+" autocomplete="off" />
+        <span class="field-note">不能包含 / 或 \\。桌面应用会在保存时执行真实文件夹重命名。</span>
+      </div>
+      <div class="field">
+        <label>更新后的本地路径</label>
+        <div class="path-preview" id="editGroupPathPreview"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelEditGroup" type="button">取消</button>
+        <button class="btn primary" type="submit">保存并重命名</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <script>
+    const icons = {
+      repo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h12a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z"/><path d="M8 4v16M18 8h2v12h-2"/></svg>',
+      clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      branch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="7" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M8 12h4a6 6 0 0 0 6-3"/></svg>',
+      folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h7l2 2h9v11H3z"/></svg>',
+      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
+      file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/></svg>'
+    };
+
+    const initialGroups = [
+      { id:'acme', name:'acme-console', path:'~/Projects/acme-console', color:'#5e6ad2', repos:['acme-console','web-app','core-service'] },
+      { id:'commerce', name:'commerce-platform', path:'~/Projects/commerce-platform', color:'#2e8b64', repos:['ops-backend','billing-api','crm-service','mobile-api'] },
+      { id:'growth', name:'growth', path:'~/Projects/growth', color:'#bf6b3b', repos:['growth-dashboard','marketing-web','notification-worker'] },
+      { id:'devtools', name:'developer-tools', path:'~/Projects/developer-tools', color:'#7a5bb6', repos:['release-cli','catalog-search','open-sdk','api-gateway'] }
+    ];
+
+    let groups = loadGroups();
+
+    const initialTasks = [
+      { id:'AGT-1042', status:'running', title:'重构用户权限中间件', summary:'拆分鉴权与授权逻辑，保持现有 API 完全兼容。', repo:'acme-console', branch:'refactor/auth-middleware', time:'12:48', elapsed:'08:16', progress:64, turns:2, prompt:'帮我重构 src/middleware/auth.ts。现在鉴权、权限判断和错误响应耦合在一起，测试也很难写。请保持 API 兼容。', attachments:[{name:'auth.ts',size:8421,type:'text/typescript'},{name:'permissions.test.ts',size:12680,type:'text/typescript'}], reply:'我已经完成现状梳理：耦合点主要在 token 解析与角色判断共享可变 request 状态。正在拆出 verifyIdentity 和 authorize 两层，并补回归测试。' },
+      { id:'AGT-1043', status:'running', title:'修复订单导出内存泄漏', summary:'排查 10 万行 CSV 导出时进程内存持续增长的问题。', repo:'ops-backend', branch:'fix/export-stream', time:'12:51', elapsed:'05:42', progress:47, turns:1, prompt:'订单 CSV 导出超过 10 万行时会把 Node 进程打爆，请找根因并修复，注意不要改变下载接口。', reply:'已复现内存峰值随行数线性增长。当前正在把全量字符串拼接替换为带背压的流式管道，并验证中途断连时资源是否正确释放。' },
+      { id:'AGT-1044', status:'running', title:'给 CLI 增加 dry-run 模式', summary:'预览即将修改的文件，不实际写盘。', repo:'release-cli', branch:'feat/dry-run', time:'12:54', elapsed:'04:28', progress:39, turns:3, prompt:'为 deploy 命令增加 --dry-run。输出所有将发生的文件和配置变化，但不要执行写操作。', reply:'参数解析和执行计划已分离。正在补齐覆盖复制、删除、配置覆盖三类动作的快照测试。' },
+      { id:'AGT-1045', status:'running', title:'升级 React Query v5', summary:'处理查询状态字段变化，并消除弃用 API。', repo:'growth-dashboard', branch:'chore/query-v5', time:'12:57', elapsed:'03:21', progress:31, turns:1, prompt:'把项目从 React Query v4 升级到 v5，修掉类型错误和弃用 API，行为不能回退。', reply:'依赖和 QueryClient 配置已升级，正在批量处理 isLoading / isPending 的语义差异并运行页面级测试。' },
+      { id:'AGT-1046', status:'running', title:'补全 Webhook 签名验证', summary:'覆盖重放攻击、时钟偏差和签名轮换。', repo:'billing-api', branch:'security/webhook-signature', time:'13:00', elapsed:'02:37', progress:22, turns:2, prompt:'Webhook 目前只比较签名字符串，请按安全最佳实践补全校验，包括重放攻击保护。', reply:'已确认现有实现缺少恒定时间比较与时间戳窗口。正在加入 nonce 去重和双密钥轮换兼容。' },
+      { id:'AGT-1047', status:'running', title:'整理数据库迁移脚本', summary:'合并重复索引，验证迁移的可逆性。', repo:'crm-service', branch:'chore/migrations', time:'13:02', elapsed:'01:52', progress:14, turns:1, prompt:'检查最近 12 个数据库迁移脚本，找出重复索引和不可逆操作，修复后跑一次完整迁移。', reply:'正在建立空库与生产结构快照的差异基线；执行结束前不会修改现有数据。' },
+      { id:'AGT-1048', status:'queued', title:'检查通知中心重复推送', summary:'定位高峰期同一消息偶发发送两次的原因。', repo:'notification-worker', branch:'main', time:'13:03', elapsed:'等待 01:23', progress:0, turns:1, prompt:'高峰期偶尔会向同一个用户推送两次完全相同的通知，请先复现再修复。', reply:'' },
+      { id:'AGT-1049', status:'queued', title:'优化首页首屏性能', summary:'目标 LCP 从 3.1s 降到 1.8s 内。', repo:'marketing-web', branch:'main', time:'13:04', elapsed:'等待 00:58', progress:0, turns:1, prompt:'首页 LCP 目前 3.1 秒，请找出主要瓶颈并优化到 1.8 秒以内，保留现有视觉效果。', reply:'' },
+      { id:'AGT-1050', status:'queued', title:'为搜索接口增加模糊匹配', summary:'支持拼音首字母与轻微错别字容错。', repo:'catalog-search', branch:'main', time:'13:05', elapsed:'等待 00:36', progress:0, turns:1, prompt:'商品搜索需要支持拼音首字母和一处错别字容错，请设计最小改动方案并实现。', reply:'' },
+      { id:'AGT-1051', status:'queued', title:'生成 SDK 发布说明', summary:'根据提交与变更文件生成面向开发者的 changelog。', repo:'open-sdk', branch:'main', time:'13:05', elapsed:'等待 00:18', progress:0, turns:1, prompt:'根据 v2.8.0 到当前版本的提交，生成一份给 SDK 用户看的发布说明。', reply:'' },
+      { id:'AGT-1038', status:'done', justCompleted:true, title:'修复头像上传方向错误', summary:'已读取 EXIF 方向并在压缩前完成归一化。', repo:'mobile-api', branch:'fix/image-orientation', time:'12:46', elapsed:'完成于 12:46', progress:100, turns:2, prompt:'iPhone 竖拍照片上传后偶尔横过来，请定位并修复。', reply:'已完成。根因是图片压缩阶段丢弃了 EXIF Orientation，但像素数据没有同步旋转。现在会先按方向归一化像素，再清理元数据并压缩；新增了 8 种 EXIF 方向的回归测试。' },
+      { id:'AGT-1037', status:'done', title:'清理废弃的 Feature Flags', summary:'移除 7 个已全量发布的开关与兼容分支。', repo:'web-app', branch:'cleanup/flags', time:'12:31', elapsed:'完成于 12:31', progress:100, turns:3, prompt:'清理已经全量发布的 Feature Flags，并删除对应死代码。', reply:'已移除 7 个开关和 14 处恒真分支，测试通过。保留了 checkout_v2，因为数据后台仍显示 3% 用户处于回滚组。' },
+      { id:'AGT-1035', status:'done', title:'补 API 限流测试', summary:'覆盖滑动窗口边界与 Redis 故障降级。', repo:'api-gateway', branch:'test/rate-limit', time:'11:58', elapsed:'完成于 11:58', progress:100, turns:1, prompt:'给 API 限流补齐边界测试，尤其是 Redis 断开时。', reply:'新增 12 个测试用例，覆盖窗口边界、并发请求和 Redis 超时。当前策略在 Redis 不可用时 fail-open，已在文档中明确记录。' },
+      { id:'AGT-1032', status:'canceled', title:'重写整个日志系统', summary:'用户主动停止：方案偏离当前最小改动范围。', repo:'core-service', branch:'experiment/logger', time:'10:42', elapsed:'已取消', progress:33, turns:2, prompt:'帮我整理日志模块。', reply:'我准备引入新的事件总线并替换现有日志接口。' }
+    ];
+
+    let tasks = loadTasks();
+    let selectedTaskId = null;
+    let newTaskFiles = [];
+    let followupFiles = [];
+
+    function loadGroups() {
+      try {
+        const saved = localStorage.getItem('agent-linear-groups-v1');
+        return saved ? JSON.parse(saved) : structuredClone(initialGroups);
+      } catch { return structuredClone(initialGroups); }
+    }
+
+    function saveGroups() {
+      localStorage.setItem('agent-linear-groups-v1', JSON.stringify(groups));
+    }
+
+    function loadTasks() {
+      try {
+        const saved = localStorage.getItem('agent-linear-demo-v2');
+        const loaded = saved ? JSON.parse(saved) : structuredClone(initialTasks);
+        return loaded.map(task => ({ ...task, group: task.group || inferGroup(task.repo) }));
+      } catch { return structuredClone(initialTasks).map(task => ({ ...task, group: inferGroup(task.repo) })); }
+    }
+
+    function saveTasks() { localStorage.setItem('agent-linear-demo-v2', JSON.stringify(tasks)); }
+
+    function inferGroup(repo) {
+      return groups.find(group => group.repos.includes(repo))?.id || groups[0].id;
+    }
+
+    function statusLabel(status) {
+      return { draft:'草稿', running:'运行中', queued:'排队中', done:'已完成', canceled:'已取消' }[status];
+    }
+
+    function render() {
+      const queuedTasks = tasks.filter(task => task.status === 'queued');
+      queuedTasks.forEach((task, index) => task.queueIndex = index + 1);
+
+      document.getElementById('sessionBoard').innerHTML = groups.map(group => groupTemplate(group)).join('');
+
+      const running = tasks.filter(task => task.status === 'running').length;
+      const queued = queuedTasks.length;
+      document.getElementById('allCount').textContent = tasks.length;
+      document.getElementById('capacityText').textContent = `${running} / 6`;
+      document.getElementById('capacityBar').style.width = `${running / 6 * 100}%`;
+      document.getElementById('capacityPill').textContent = `${running} 个 Agent 正在工作 · ${queued} 个等待`;
+
+      document.querySelectorAll('.task-card').forEach(card => card.addEventListener('click', () => openDrawer(card.dataset.id)));
+      document.querySelectorAll('[data-add-group]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.addGroup)));
+      document.querySelectorAll('[data-edit-group]').forEach(button => button.addEventListener('click', () => openEditGroup(button.dataset.editGroup)));
+      saveTasks();
+    }
+
+    function groupTemplate(group) {
+      const items = tasks.filter(task => task.group === group.id);
+      const running = items.filter(task => task.status === 'running').length;
+      const queued = items.filter(task => task.status === 'queued').length;
+      const statusSummary = [running ? `${running} 运行` : '', queued ? `${queued} 等待` : ''].filter(Boolean).join(' · ') || '暂无执行';
+      return `
+        <div class="column" data-group="${group.id}" style="--group-color:${group.color}">
+          <div class="column-head">
+            <div class="group-head-top">
+              <span class="group-icon">${icons.folder}</span>
+              <span class="group-title">${escapeHtml(group.name)}</span>
+              <span class="column-count">${items.length}</span>
+              <span class="column-meta">${statusSummary}</span>
+              <button class="group-menu" data-edit-group="${group.id}" type="button" aria-label="重命名 ${escapeHtml(group.name)}">•••</button>
+            </div>
+            <div class="group-path">${icons.folder}<span>${escapeHtml(group.path)}</span></div>
+          </div>
+          <div class="card-list">
+            ${items.length ? items.map(cardTemplate).join('') : '<div class="empty-column">这个分组还没有任务</div>'}
+            <button class="add-task-card" data-add-group="${group.id}" type="button">${icons.plus}<span>在此分组添加任务</span></button>
+          </div>
+        </div>`;
+    }
+
+    function cardTemplate(task) {
+      const isQueued = task.status === 'queued';
+      return `
+        <article class="task-card ${task.status} ${task.justCompleted ? 'just-completed' : ''}" data-id="${task.id}" tabindex="0">
+          ${task.status === 'running' ? '<span class="running-bar"></span>' : ''}
+          <div class="card-top">
+            ${isQueued ? `<span class="queue-index">${task.queueIndex}</span>` : `<span class="card-id">${task.id}</span>`}
+            <span class="status-chip ${task.status}"><span class="chip-dot"></span>${statusLabel(task.status)}</span>
+            <span class="card-time">${task.elapsed}</span>
+          </div>
+          <h3>${escapeHtml(task.title)}</h3>
+          <p>${escapeHtml(task.summary)}</p>
+          ${(task.status === 'running' || task.status === 'queued') ? `<div class="card-progress"><span style="width:${task.progress}%"></span></div>` : ''}
+          <div class="card-footer">
+            <span class="repo-badge">${icons.repo}<span>${escapeHtml(task.repo)}</span></span>
+            <span class="turn-count">${task.turns} 轮对话</span>
+          </div>
+        </article>`;
+    }
+
+    function openDrawer(id) {
+      selectedTaskId = id;
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      document.getElementById('drawerId').textContent = task.id;
+      document.getElementById('drawerTitle').textContent = task.title;
+      const status = document.getElementById('drawerStatus');
+      status.className = `status-chip ${task.status}`;
+      status.innerHTML = `<span class="chip-dot"></span>${statusLabel(task.status)}`;
+      document.getElementById('drawerMeta').innerHTML = `<span>${icons.repo}${escapeHtml(task.repo)}</span><span>${icons.branch}${escapeHtml(task.branch)}</span><span>${icons.clock}${escapeHtml(task.elapsed)}</span>`;
+      document.getElementById('contextNote').textContent = `已载入 ${task.turns} 轮上下文`;
+      const stopButton = document.getElementById('stopTask');
+      stopButton.style.display = ['running','queued'].includes(task.status) ? 'inline-flex' : 'none';
+      stopButton.textContent = task.status === 'queued' ? '取消排队' : '停止任务';
+      document.getElementById('continueTask').textContent = task.status === 'draft' ? '运行' : '继续';
+      renderConversation(task);
+      document.getElementById('taskDrawer').classList.add('open');
+      document.getElementById('drawerScrim').classList.add('open');
+      document.getElementById('taskDrawer').setAttribute('aria-hidden','false');
+    }
+
+    function renderConversation(task) {
+      const messages = [
+        `<div class="message user"><div class="avatar">我</div><div class="bubble"><p>${escapeHtml(task.prompt)}</p>${messageAttachments(task.attachments)}<div class="message-time">${task.time}</div></div></div>`
+      ];
+      if (task.reply) {
+        messages.push(`<div class="message agent"><div class="avatar">AL</div><div class="bubble"><p>${escapeHtml(task.reply)}</p><div class="message-time">Agent Linear · ${task.status === 'done' ? '最终交付' : '上一轮结果'}</div></div></div>`);
+      }
+      if (task.followups) {
+        task.followups.forEach(item => {
+          const text = typeof item === 'string' ? item : item.text;
+          const attachments = typeof item === 'string' ? [] : item.attachments;
+          messages.push(`<div class="message user"><div class="avatar">我</div><div class="bubble">${text ? `<p>${escapeHtml(text)}</p>` : ''}${messageAttachments(attachments)}<div class="message-time">刚刚</div></div></div>`);
+        });
+      }
+      if (task.status === 'running') {
+        messages.push('<div class="execution-placeholder"><div class="quiet-bars"><i></i><i></i><i></i></div><strong>Agent 正在静默执行</strong>本轮完成后，将一次性展示最终结果。</div>');
+      } else if (task.status === 'queued') {
+        messages.push(`<div class="execution-placeholder"><strong>正在等待执行槽位</strong>当前排在第 ${task.queueIndex || 1} 位，有任务结束后会自动启动。</div>`);
+      }
+      document.getElementById('conversation').innerHTML = messages.join('');
+      document.getElementById('conversation').scrollTop = document.getElementById('conversation').scrollHeight;
+    }
+
+    function messageAttachments(attachments = []) {
+      if (!attachments?.length) return '';
+      return `<div class="message-attachments">${attachments.map(file => `<div class="message-file">${icons.file}<span>${escapeHtml(file.name)}</span><small class="attachment-size">${formatBytes(file.size)}</small></div>`).join('')}</div>`;
+    }
+
+    function closeDrawer() {
+      document.getElementById('taskDrawer').classList.remove('open');
+      document.getElementById('drawerScrim').classList.remove('open');
+      document.getElementById('taskDrawer').setAttribute('aria-hidden','true');
+      document.getElementById('followupInput').value = '';
+      followupFiles = [];
+      renderAttachmentTray('followupAttachmentTray', followupFiles, 'followup');
+    }
+
+    function stopSelectedTask() {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      if (!task || !['running','queued'].includes(task.status)) return;
+      const wasRunning = task.status === 'running';
+      task.status = 'canceled';
+      task.elapsed = '已取消';
+      task.summary = wasRunning ? '用户主动停止，后台进程已被彻底终止。' : '用户在任务启动前取消了排队。';
+      task.justCompleted = false;
+      if (wasRunning) promoteNextTask();
+      render();
+      openDrawer(task.id);
+      toast('任务已停止', wasRunning ? '对应进程已终止，队首任务已自动递补。' : '该任务已从等待队列移除。');
+    }
+
+    function promoteNextTask() {
+      const next = tasks.find(t => t.status === 'queued');
+      if (!next) return;
+      next.status = 'running';
+      next.elapsed = '00:01';
+      next.progress = 4;
+      next.summary = '已获得执行槽位，正在启动本地 Codex 会话。';
+      toast('队列自动递补', `${next.id}「${next.title}」已开始执行。`);
+    }
+
+    function continueSelectedTask() {
+      const task = tasks.find(t => t.id === selectedTaskId);
+      const input = document.getElementById('followupInput');
+      const message = input.value.trim();
+      if (!task || (!message && !followupFiles.length)) { input.focus(); return; }
+      task.followups = task.followups || [];
+      task.followups.push({ text:message, attachments:followupFiles.map(serializeFile) });
+      task.turns += 1;
+      task.justCompleted = false;
+      const runningCount = tasks.filter(t => t.status === 'running').length;
+      if (task.status !== 'running') {
+        task.status = runningCount < 6 ? 'running' : 'queued';
+        task.elapsed = task.status === 'running' ? '00:01' : '等待 00:01';
+        task.progress = task.status === 'running' ? 3 : 0;
+      }
+      input.value = '';
+      followupFiles = [];
+      document.getElementById('followupFileInput').value = '';
+      renderAttachmentTray('followupAttachmentTray', followupFiles, 'followup');
+      render();
+      openDrawer(task.id);
+      toast('上下文已恢复', task.status === 'running' ? `第 ${task.turns} 轮已开始执行。` : `第 ${task.turns} 轮已进入队列，历史上下文不会丢失。`);
+    }
+
+    function createTask(event) {
+      event.preventDefault();
+      const runningCount = tasks.filter(t => t.status === 'running').length;
+      const status = runningCount < 6 ? 'running' : 'queued';
+      const maxId = Math.max(...tasks.map(t => Number(t.id.split('-')[1])));
+      const groupId = document.getElementById('taskGroupId').value;
+      const task = {
+        id:`AGT-${maxId + 1}`,
+        status,
+        group:groupId,
+        title:document.getElementById('taskTitleInput').value.trim(),
+        summary: status === 'running' ? '本地会话已创建，正在静默执行第一轮指令。' : '并发槽位已满，任务按创建顺序等待执行。',
+        repo:document.getElementById('taskRepoInput').value.trim() || 'local-workspace',
+        branch:'main',
+        time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),
+        elapsed: status === 'running' ? '00:01' : '等待 00:01',
+        progress: status === 'running' ? 2 : 0,
+        turns:1,
+        prompt:document.getElementById('taskPromptInput').value.trim(),
+        attachments:newTaskFiles.map(serializeFile),
+        reply:''
+      };
+      tasks.splice(6, 0, task);
+      closeModal();
+      render();
+      openDrawer(task.id);
+      toast(status === 'running' ? '任务已启动' : '任务已加入队列', status === 'running' ? '已创建独立 Codex 会话。' : '当前 6 个执行槽位均被占用。');
+    }
+
+    function openModal(groupId = groups[0].id) {
+      const group = groups.find(item => item.id === groupId) || groups[0];
+      newTaskFiles = [];
+      document.getElementById('taskFileInput').value = '';
+      renderAttachmentTray('taskAttachmentTray', newTaskFiles, 'task');
+      document.getElementById('taskGroupId').value = group.id;
+      document.getElementById('taskGroupInput').value = group.name;
+      document.getElementById('taskRepoInput').value = group.path;
+      document.getElementById('newTaskModal').classList.add('open');
+      setTimeout(() => document.getElementById('taskTitleInput').focus(), 30);
+    }
+    function closeModal() {
+      document.getElementById('newTaskModal').classList.remove('open');
+      newTaskFiles = [];
+      document.getElementById('taskFileInput').value = '';
+      renderAttachmentTray('taskAttachmentTray', newTaskFiles, 'task');
+    }
+
+    function openEditGroup(groupId) {
+      const group = groups.find(item => item.id === groupId);
+      if (!group) return;
+      document.getElementById('editGroupId').value = group.id;
+      document.getElementById('editGroupName').value = group.name;
+      updateGroupPathPreview();
+      document.getElementById('editGroupModal').classList.add('open');
+      setTimeout(() => document.getElementById('editGroupName').select(), 30);
+    }
+
+    function closeEditGroup() {
+      document.getElementById('editGroupModal').classList.remove('open');
+    }
+
+    function renamedPath(path, name) {
+      const parent = path.replace(/\/+[^/]+\/?$/, '');
+      return `${parent}/${name}`;
+    }
+
+    function updateGroupPathPreview() {
+      const group = groups.find(item => item.id === document.getElementById('editGroupId').value);
+      if (!group) return;
+      const name = document.getElementById('editGroupName').value.trim() || group.name;
+      document.getElementById('editGroupPathPreview').innerHTML = `${icons.folder}<span>${escapeHtml(renamedPath(group.path, name))}</span>`;
+    }
+
+    function saveGroupRename(event) {
+      event.preventDefault();
+      const group = groups.find(item => item.id === document.getElementById('editGroupId').value);
+      const name = document.getElementById('editGroupName').value.trim();
+      if (!group || !name || /[\\/]/.test(name)) return;
+      const oldPath = group.path;
+      group.name = name;
+      group.path = renamedPath(group.path, name);
+      saveGroups();
+      closeEditGroup();
+      render();
+      toast('分组已重命名', `${oldPath} → ${group.path}`);
+    }
+
+    function serializeFile(file) {
+      return { name:file.name, size:file.size, type:file.type || 'application/octet-stream' };
+    }
+
+    function formatBytes(bytes = 0) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function addSelectedFiles(scope, fileList) {
+      const current = scope === 'task' ? newTaskFiles : followupFiles;
+      const merged = [...current];
+      Array.from(fileList).forEach(file => {
+        if (!merged.some(item => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)) merged.push(file);
+      });
+      if (scope === 'task') newTaskFiles = merged;
+      else followupFiles = merged;
+      renderAttachmentTray(scope === 'task' ? 'taskAttachmentTray' : 'followupAttachmentTray', merged, scope);
+    }
+
+    function renderAttachmentTray(targetId, files, scope) {
+      const tray = document.getElementById(targetId);
+      if (!tray) return;
+      tray.innerHTML = files.map((file, index) => `<span class="attachment-chip">${icons.file}<span class="attachment-chip-name">${escapeHtml(file.name)}</span><span class="attachment-size">${formatBytes(file.size)}</span><button class="attachment-remove" type="button" data-remove-file="${scope}:${index}" aria-label="移除 ${escapeHtml(file.name)}">×</button></span>`).join('');
+      tray.querySelectorAll('[data-remove-file]').forEach(button => button.addEventListener('click', () => {
+        const index = Number(button.dataset.removeFile.split(':')[1]);
+        if (scope === 'task') {
+          newTaskFiles.splice(index, 1);
+          renderAttachmentTray(targetId, newTaskFiles, scope);
+        } else {
+          followupFiles.splice(index, 1);
+          renderAttachmentTray(targetId, followupFiles, scope);
+        }
+      }));
+    }
+
+    function toast(title, detail) {
+      const item = document.createElement('div');
+      item.className = 'toast';
+      item.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span>`;
+      document.getElementById('toastStack').appendChild(item);
+      setTimeout(() => item.remove(), 3600);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    }
+
+    document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
+    document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
+    document.getElementById('stopTask').addEventListener('click', stopSelectedTask);
+    document.getElementById('continueTask').addEventListener('click', continueSelectedTask);
+    document.getElementById('cancelNewTask').addEventListener('click', closeModal);
+    document.getElementById('newTaskModal').addEventListener('click', event => { if (event.target.id === 'newTaskModal') closeModal(); });
+    document.getElementById('newTaskForm').addEventListener('submit', createTask);
+    document.getElementById('cancelEditGroup').addEventListener('click', closeEditGroup);
+    document.getElementById('editGroupModal').addEventListener('click', event => { if (event.target.id === 'editGroupModal') closeEditGroup(); });
+    document.getElementById('editGroupForm').addEventListener('submit', saveGroupRename);
+    document.getElementById('editGroupName').addEventListener('input', updateGroupPathPreview);
+    document.getElementById('taskFileInput').addEventListener('change', event => {
+      addSelectedFiles('task', event.target.files);
+      event.target.value = '';
+    });
+    document.getElementById('followupFileInput').addEventListener('change', event => {
+      addSelectedFiles('followup', event.target.files);
+      event.target.value = '';
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); closeModal(); closeEditGroup(); } });
+    document.getElementById('followupInput').addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') continueSelectedTask(); });
+
+    render();
+  </script>
+</body>
+</html>
