@@ -11,6 +11,7 @@ function readyPreflight() {
     checks:[
       { id:'node', status:'ok', summary:'Node.js 22.16.0', action:'' },
       { id:'codex-cli', status:'ok', summary:'codex-cli 1.0.0', action:'' },
+      { id:'codex-app-server', status:'ok', summary:'Codex app-server 协议可用', action:'' },
       { id:'codex-auth', status:'ok', summary:'Logged in', action:'' }
     ]
   };

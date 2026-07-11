@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { CodexAdapter, CodexExecutionError } from '../src/codex-adapter.js';
+import { buildAppServerTurn, CodexAdapter, CodexExecutionError } from '../src/codex-adapter.js';
 
 const fixtureDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,56 +30,137 @@ async function waitFor(predicate, timeoutMs = 3000) {
   throw new Error('Timed out waiting for process state');
 }
 
-function fakeProcess(events, { exitCode = 0, stderr = '' } = {}) {
+function fakeAppServer({ sessionId = 'thread-1', source = 'vscode', output = 'finished', usage = { inputTokens:12, outputTokens:3, totalTokens:15 } } = {}) {
+  const child = new EventEmitter();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.stdin = new PassThrough();
+  child.requests = [];
+  let inputBuffer = '';
+  const send = message => child.stdout.write(`${JSON.stringify(message)}\n`);
+  child.stdin.on('data', chunk => {
+    inputBuffer += chunk.toString();
+    const lines = inputBuffer.split(/\r?\n/);
+    inputBuffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line) continue;
+      const request = JSON.parse(line);
+      child.requests.push(request);
+      if (request.method === 'initialize') send({ id:request.id, result:{ userAgent:'fake' } });
+      if (request.method === 'thread/start' || request.method === 'thread/resume') {
+        send({ id:request.id, result:{ thread:{ id:request.params.threadId || sessionId, source } } });
+      }
+      if (request.method === 'thread/fork') send({ id:request.id, result:{ thread:{ id:'thread-migrated', source:'vscode' } } });
+      if (request.method === 'thread/name/set') send({ id:request.id, result:{} });
+      if (request.method === 'turn/start') {
+        send({ id:request.id, result:{ turn:{ id:'turn-1', status:'inProgress', items:[] } } });
+        queueMicrotask(() => {
+          send({ method:'turn/started', params:{ threadId:sessionId, turn:{ id:'turn-1', status:'inProgress', items:[] } } });
+          send({ method:'thread/tokenUsage/updated', params:{ threadId:sessionId, turnId:'turn-1', tokenUsage:usage } });
+          send({ method:'item/completed', params:{ threadId:sessionId, turnId:'turn-1', completedAtMs:Date.now(), item:{ id:'item-1', type:'agentMessage', text:output } } });
+          send({ method:'turn/completed', params:{ threadId:sessionId, turn:{ id:'turn-1', status:'completed', items:[] } } });
+        });
+      }
+    }
+  });
+  child.stdin.on('finish', () => queueMicrotask(() => {
+    child.stdout.end();
+    child.stderr.end();
+    child.emit('close', 0, null);
+  }));
+  return child;
+}
+
+function failedProcess() {
   const child = new EventEmitter();
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
   child.stdin = new PassThrough();
   queueMicrotask(() => {
-    if (stderr) child.stderr.write(stderr);
-    events.forEach(event => child.stdout.write(`${JSON.stringify(event)}\n`));
+    child.stderr.end('permission denied\n');
     child.stdout.end();
-    child.stderr.end();
-    child.emit('close', exitCode, null);
+    child.emit('close', 7, null);
   });
   return child;
 }
 
-test('parses a new Codex JSONL session and final output', async () => {
+test('uses app-server to create an interactive session and collect the final output', async () => {
   let invocation;
   const adapter = new CodexAdapter({ spawnProcess(executable, args, options) {
     invocation = { executable, args, options };
-    return fakeProcess([
-      { type:'thread.started', thread_id:'thread-1' },
-      { type:'item.completed', item:{ type:'agent_message', text:'finished' } },
-      { type:'turn.completed', usage:{ input_tokens:12, output_tokens:3 } }
-    ]);
+    invocation.child = fakeAppServer();
+    return invocation.child;
   } });
-  const result = await adapter.execute({ executable:'/usr/bin/codex', cwd:'/tmp/project', prompt:'work' });
+  const result = await adapter.execute({ executable:'/usr/bin/codex', cwd:'/tmp/project', prompt:'work', threadName:'Visible task' });
   assert.equal(result.sessionId, 'thread-1');
   assert.equal(result.finalOutput, 'finished');
-  assert.equal(result.usage.output_tokens, 3);
-  assert.deepEqual(invocation.args, ['exec','-s','workspace-write','-C','/tmp/project','--json','-']);
+  assert.equal(result.usage.outputTokens, 3);
+  assert.deepEqual(invocation.args, ['app-server','--stdio']);
   assert.equal(invocation.options.cwd, '/tmp/project');
+  assert.deepEqual(invocation.child.requests.map(request => request.method), ['initialize','initialized','thread/start','thread/name/set','turn/start']);
+  const threadStart = invocation.child.requests.find(request => request.method === 'thread/start');
+  assert.equal(threadStart.params.threadSource, 'agentlinear');
+  assert.equal(invocation.child.requests.find(request => request.method === 'thread/name/set').params.name, 'Visible task');
 });
 
-test('uses the official resume command for follow-up turns', async () => {
-  let args;
+test('uses app-server thread/resume for follow-up turns', async () => {
+  let child;
   const adapter = new CodexAdapter({ spawnProcess(_executable, receivedArgs) {
-    args = receivedArgs;
-    return fakeProcess([
-      { type:'thread.started', thread_id:'thread-1' },
-      { type:'item.completed', item:{ type:'agent_message', text:'continued' } }
-    ]);
+    assert.deepEqual(receivedArgs, ['app-server','--stdio']);
+    child = fakeAppServer({ output:'continued' });
+    return child;
   } });
   const result = await adapter.execute({ cwd:'/tmp/project', prompt:'continue', sessionId:'thread-1' });
   assert.equal(result.finalOutput, 'continued');
-  assert.deepEqual(args, ['exec','resume','--json','thread-1','-']);
+  const resume = child.requests.find(request => request.method === 'thread/resume');
+  assert.equal(resume.params.threadId, 'thread-1');
+  assert.equal(child.requests.some(request => request.method === 'thread/name/set'), false);
+});
+
+test('forks a legacy exec session into an interactive thread without losing its history', async () => {
+  let child;
+  const adapter = new CodexAdapter({ spawnProcess() {
+    child = fakeAppServer({ sessionId:'thread-legacy', source:'exec', output:'migrated' });
+    return child;
+  } });
+  const result = await adapter.execute({
+    cwd:'/tmp/project',
+    prompt:'continue legacy work',
+    sessionId:'thread-legacy',
+    threadName:'Legacy task'
+  });
+  assert.equal(result.sessionId, 'thread-migrated');
+  assert.equal(result.migratedFromSessionId, 'thread-legacy');
+  assert.equal(result.finalOutput, 'migrated');
+  assert.deepEqual(child.requests.map(request => request.method), [
+    'initialize','initialized','thread/resume','thread/fork','thread/name/set','turn/start'
+  ]);
+  assert.equal(child.requests.find(request => request.method === 'thread/fork').params.threadId, 'thread-legacy');
+  assert.equal(child.requests.find(request => request.method === 'turn/start').params.threadId, 'thread-migrated');
+});
+
+test('prepares and migrates a legacy session without starting a new turn', async () => {
+  let child;
+  const adapter = new CodexAdapter({ spawnProcess() {
+    child = fakeAppServer({ sessionId:'thread-legacy', source:'exec' });
+    return child;
+  } });
+  const result = await adapter.prepareSession({
+    cwd:'/tmp/project',
+    sessionId:'thread-legacy',
+    threadName:'Legacy task'
+  });
+  assert.equal(result.sessionId, 'thread-migrated');
+  assert.equal(result.migratedFromSessionId, 'thread-legacy');
+  assert.equal(result.finalOutput, '');
+  assert.deepEqual(child.requests.map(request => request.method), [
+    'initialize','initialized','thread/resume','thread/fork','thread/name/set'
+  ]);
 });
 
 test('returns exit diagnostics on Codex failure', async () => {
   const adapter = new CodexAdapter({ spawnProcess() {
-    return fakeProcess([{ type:'thread.started', thread_id:'thread-2' }], { exitCode:7, stderr:'permission denied\n' });
+    return failedProcess();
   } });
   await assert.rejects(
     adapter.execute({ cwd:'/tmp/project', prompt:'work' }),
@@ -117,15 +198,10 @@ test('aborting a run terminates the full local process tree', async () => {
 });
 
 test('grants local attachment directories and adds image inputs to Codex', async () => {
-  let args;
-  let stdin = '';
+  let child;
   const adapter = new CodexAdapter({ spawnProcess(_executable, receivedArgs) {
-    args = receivedArgs;
-    const child = fakeProcess([
-      { type:'thread.started', thread_id:'thread-files' },
-      { type:'item.completed', item:{ type:'agent_message', text:'read files' } }
-    ]);
-    child.stdin.on('data', chunk => { stdin += chunk.toString(); });
+    assert.deepEqual(receivedArgs, ['app-server','--stdio']);
+    child = fakeAppServer({ sessionId:'thread-files', output:'read files' });
     return child;
   } });
   await adapter.execute({
@@ -136,10 +212,18 @@ test('grants local attachment directories and adds image inputs to Codex', async
       { name:'screen.png', path:'/outside/images/screen.png', mimeType:'image/png' }
     ]
   });
-  assert.deepEqual(args, [
-    '--add-dir','/outside/docs','--add-dir','/outside/images',
-    'exec','-s','workspace-write','-C','/workspace','--json','-i','/outside/images/screen.png','-'
-  ]);
-  assert.match(stdin, /agentlinear_attachments/);
-  assert.match(stdin, /\/outside\/docs\/notes\.md/);
+  const turn = child.requests.find(request => request.method === 'turn/start').params;
+  assert.deepEqual(turn.sandboxPolicy.writableRoots, ['/workspace','/outside/docs','/outside/images']);
+  assert.equal(turn.input.some(input => input.type === 'localImage' && input.path === '/outside/images/screen.png'), true);
+  assert.match(turn.input[0].text, /agentlinear_attachments/);
+  assert.match(turn.input[0].text, /\/outside\/docs\/notes\.md/);
+});
+
+test('builds a workspace-write turn without special cases for an empty attachment list', () => {
+  assert.deepEqual(buildAppServerTurn({ cwd:'/workspace', prompt:'work' }), {
+    input:[{ type:'text', text:'work' }],
+    cwd:'/workspace',
+    approvalPolicy:'never',
+    sandboxPolicy:{ type:'workspaceWrite', writableRoots:['/workspace'], networkAccess:false }
+  });
 });

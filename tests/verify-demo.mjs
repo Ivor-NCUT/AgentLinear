@@ -84,7 +84,10 @@ assert(preload.includes("ipcRenderer.invoke('tasks:retry'"), '预加载脚本缺
 assert(recovery.includes("status = 'interrupted'"), '启动恢复没有标记中断运行');
 assert(recovery.includes('looksLikeCodexProcess'), '启动恢复缺少进程身份校验');
 assert(recovery.includes('lease_token = NULL'), '启动恢复缺少持久队列租约修复');
-assert(codexAdapter.includes("'--add-dir'"), 'Codex 适配器没有开放附件目录');
+assert(codexAdapter.includes("['app-server', '--stdio']"), 'Codex 适配器没有使用交互式 app-server 协议');
+assert(codexAdapter.includes("threadSource:'agentlinear'"), 'Codex app-server 线程缺少 AgentLinear 来源标识');
+assert(codexAdapter.includes('writableRoots'), 'Codex 适配器没有开放附件目录');
+assert(codexAdapter.includes("type:'localImage'"), 'Codex app-server 没有传递本地图片输入');
 assert(codexAdapter.includes('agentlinear_attachments'), 'Codex prompt 缺少附件清单');
 assert(readme.includes('docs/ARCHITECTURE.md'), 'README 缺少架构文档入口');
 

@@ -124,6 +124,17 @@ export function runEnvironmentPreflight({
     ));
   } else {
     checks.push(success('codex-cli', firstLine(located.probe.stdout), located.executable));
+    const appServer = runCommand(located.executable, ['app-server', '--help'], { encoding:'utf8', timeout:5000 });
+    if (!appServer.error && appServer.status === 0) {
+      checks.push(success('codex-app-server', 'Codex app-server 协议可用', '会话可被交互客户端识别'));
+    } else {
+      checks.push(failure(
+        'codex-app-server',
+        '当前 Codex CLI 不支持 app-server',
+        firstLine(appServer.error?.message || appServer.stderr || appServer.stdout),
+        '升级 Codex CLI 后重新运行环境检查。'
+      ));
+    }
     const auth = runCommand(located.executable, ['login', 'status'], { encoding: 'utf8', timeout: 8000 });
     if (!auth.error && auth.status === 0) {
       checks.push(success('codex-auth', firstLine(auth.stdout || auth.stderr), '复用本机 Codex 登录状态'));

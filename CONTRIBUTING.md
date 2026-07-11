@@ -21,6 +21,7 @@ npm run check
 - 不提交密钥、数据库、日志、用户文件或绝对个人路径。
 - 调度器必须继续维持全局 FIFO 和最多 6 个并发任务。
 - 同一卡片续聊必须复用原 Codex Session ID。
+- 新线程必须通过 app-server 创建并设置用户可见名称；禁止退回 `codex exec` 或直接改写 Codex 会话索引。
 - 进程、数据库或 IPC 边界变化时，同步更新 `docs/ARCHITECTURE.md`。
 
 Bug 报告请说明 macOS、Node.js 与 Codex CLI 版本、复现步骤和预期行为。请先删除日志中的用户名、项目路径、指令内容与其他隐私信息。

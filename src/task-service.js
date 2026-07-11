@@ -8,6 +8,8 @@
 import { randomUUID } from 'node:crypto';
 import { createAttachmentService } from './attachment-service.js';
 
+const APP_SERVER_SESSION_MIGRATION_KEY = 'codex_app_server_sessions_v1';
+
 function timestamp() {
   return new Date().toISOString();
 }
@@ -119,6 +121,52 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
     return database.prepare('SELECT id FROM tasks ORDER BY created_at, id').all().map(row => get(row.id));
   }
 
+  async function migrateLegacySessions() {
+    const report = { examined:0, migrated:0, failures:[] };
+    const completed = database.prepare('SELECT value_json FROM settings WHERE key = ?').get(APP_SERVER_SESSION_MIGRATION_KEY);
+    if (completed?.value_json === 'true') return report;
+    const candidates = database.prepare(`
+      SELECT tasks.id AS task_id, tasks.title, groups.folder_path AS cwd,
+             sessions.id AS local_session_id, sessions.external_session_id
+      FROM sessions
+      JOIN tasks ON tasks.id = sessions.task_id
+      JOIN groups ON groups.id = tasks.group_id
+      WHERE sessions.external_session_id IS NOT NULL
+      ORDER BY tasks.created_at, tasks.id
+    `).all();
+    for (const candidate of candidates) {
+      report.examined += 1;
+      try {
+        const readiness = ensureReady(candidate.cwd);
+        const prepared = await adapter.prepareSession({
+          executable:readiness.codexExecutable,
+          cwd:candidate.cwd,
+          sessionId:candidate.external_session_id,
+          threadName:candidate.title
+        });
+        if (prepared.sessionId !== candidate.external_session_id) {
+          database.prepare(`
+            UPDATE sessions SET external_session_id = ?, state = 'ready', updated_at = ? WHERE id = ?
+          `).run(prepared.sessionId, timestamp(), candidate.local_session_id);
+          report.migrated += 1;
+          onChanged(get(candidate.task_id));
+        }
+      } catch (error) {
+        report.failures.push({
+          taskId:candidate.task_id,
+          message:error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    if (!report.failures.length) {
+      database.prepare(`
+        INSERT INTO settings (key, value_json, updated_at) VALUES (?, 'true', ?)
+        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
+      `).run(APP_SERVER_SESSION_MIGRATION_KEY, timestamp());
+    }
+    return report;
+  }
+
   function create({ groupId, title, prompt, attachmentPaths = [] }) {
     const cleanTitle = requiredText(title, '任务标题', 120);
     const cleanPrompt = requiredText(prompt, '第一条指令', 100_000);
@@ -225,6 +273,7 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
         executable: readiness.codexExecutable,
         cwd: task.cwd,
         prompt: userMessage.content,
+        threadName:task.title,
         sessionId: session.external_session_id || null,
         signal: controller.signal,
         timeoutMs: executionTimeoutMs,
@@ -388,6 +437,7 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
   return {
     list,
     get,
+    migrateLegacySessions,
     create,
     followup,
     executeQueued,
