@@ -499,6 +499,9 @@
     @keyframes toastIn { from { transform: translateY(8px); opacity: 0; } }
 
     .empty-column { padding: 22px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-card); color: var(--faint); text-align: center; font-size: 11px; }
+    .board-empty { width: min(460px, calc(100vw - 48px)); padding: 36px 24px; border: 1px dashed var(--line-strong); border-radius: var(--radius-card); color: var(--muted); background: rgba(255,255,255,.55); text-align: center; }
+    .board-empty strong { display: block; margin-bottom: 7px; color: var(--ink); font-size: 14px; }
+    .board-empty p { margin: 0 0 16px; font-size: 11px; line-height: 1.55; }
 
     @media (max-width: 900px) {
       .app { grid-template-columns: 64px minmax(0,1fr); }
@@ -774,6 +777,17 @@
     </form>
   </div>
 
+  <div class="modal-scrim" id="confirmModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h2 id="confirmTitle">确认操作</h2>
+      <p id="confirmMessage">这个操作会修改当前任务状态。</p>
+      <div class="modal-actions">
+        <button class="btn" id="cancelConfirm" type="button">返回</button>
+        <button class="btn danger" id="executeConfirm" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
   <script>
@@ -806,7 +820,7 @@
       { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'done' },
       { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'done' },
       { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'done' },
-      { id:'FE-10', priority:'P1', phase:'M2', title:'异常、空白与危险操作反馈', detail:'覆盖无分组、无任务、文件失效、启动失败、队列异常和删除确认。', acceptance:'每个异常都有下一步操作；危险动作二次确认；页面不会停在无法理解的状态。', status:'confirm' },
+      { id:'FE-10', priority:'P1', phase:'M2', title:'异常、空白与危险操作反馈', detail:'覆盖无分组、无任务、文件失效、启动失败、队列异常和删除确认。', acceptance:'每个异常都有下一步操作；危险动作二次确认；页面不会停在无法理解的状态。', status:'done' },
       { id:'FE-11', priority:'P1', phase:'M2', title:'完整演示脚本与产品逻辑冻结', detail:'固化从建组、提交 10 个任务、续聊、停止、恢复到查看交付的验收流程。', acceptance:'按脚本完整走一遍无断点；你确认交互后输出前端逻辑说明，再开始后端设计。', status:'confirm' }
     ];
 
@@ -858,6 +872,7 @@
     let pendingCreateFolder = null;
     let pendingEditFolder = null;
     let removeGroupArmed = false;
+    let pendingConfirmation = null;
     const conversationScrollPositions = new Map();
 
     function loadGroups() {
@@ -973,7 +988,7 @@
       queuedTasks.forEach((task, index) => task.queueIndex = index + 1);
 
       const board = document.getElementById('sessionBoard');
-      board.innerHTML = groups.map(group => groupTemplate(group)).join('');
+      board.innerHTML = groups.length ? groups.map(group => groupTemplate(group)).join('') : '<div class="board-empty"><strong>还没有 Session 分组</strong><p>先关联一个本地项目文件夹，再在分组里创建任务。</p><button class="btn primary" id="emptyAddGroup" type="button">关联本地文件夹</button></div>';
       board.style.gridTemplateColumns = `repeat(${Math.max(groups.length, 1)}, minmax(280px, 1fr))`;
       board.style.minWidth = groups.length > 1 ? `${groups.length * 294}px` : '0';
       document.getElementById('groupSummary').textContent = `${groups.length} 个 Session 分组 · 每组关联一个本地文件夹`;
@@ -991,6 +1006,7 @@
       document.querySelectorAll('.task-card').forEach(card => card.addEventListener('click', () => openDrawer(card.dataset.id)));
       document.querySelectorAll('[data-add-group]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.addGroup)));
       document.querySelectorAll('[data-edit-group]').forEach(button => button.addEventListener('click', () => openEditGroup(button.dataset.editGroup)));
+      document.getElementById('emptyAddGroup')?.addEventListener('click', openCreateGroup);
       saveTasks();
     }
 
@@ -1178,6 +1194,32 @@
       promoteNextTask();
       render();
       notifyCompletion(task);
+    }
+
+    function requestStopSelectedTask() {
+      const task = tasks.find(item => item.id === selectedTaskId);
+      if (!task) return;
+      const actionLabel = task.status === 'running' ? '停止任务' : '取消任务';
+      openConfirmation(actionLabel, `“${task.title}”的历史对话会保留，但本轮执行不会继续。`, actionLabel, stopSelectedTask);
+    }
+
+    function openConfirmation(title, message, actionLabel, action) {
+      pendingConfirmation = action;
+      document.getElementById('confirmTitle').textContent = title;
+      document.getElementById('confirmMessage').textContent = message;
+      document.getElementById('executeConfirm').textContent = actionLabel;
+      document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function closeConfirmation() {
+      document.getElementById('confirmModal').classList.remove('open');
+      pendingConfirmation = null;
+    }
+
+    function executeConfirmation() {
+      const action = pendingConfirmation;
+      closeConfirmation();
+      if (typeof action === 'function') action();
     }
 
     function stopSelectedTask() {
@@ -1532,7 +1574,7 @@
     document.getElementById('addGroupButton').addEventListener('click', openCreateGroup);
     document.getElementById('soundToggleButton').addEventListener('click', toggleSound);
     document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
-    document.getElementById('stopTask').addEventListener('click', stopSelectedTask);
+    document.getElementById('stopTask').addEventListener('click', requestStopSelectedTask);
     document.getElementById('completeTask').addEventListener('click', completeSelectedTask);
     document.getElementById('retryTask').addEventListener('click', retrySelectedTask);
     document.getElementById('continueTask').addEventListener('click', continueSelectedTask);
@@ -1557,7 +1599,10 @@
       addSelectedFiles('followup', event.target.files);
       event.target.value = '';
     });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); closeModal(); closeEditGroup(); closeCreateGroup(); } });
+    document.getElementById('cancelConfirm').addEventListener('click', closeConfirmation);
+    document.getElementById('executeConfirm').addEventListener('click', executeConfirmation);
+    document.getElementById('confirmModal').addEventListener('click', event => { if (event.target.id === 'confirmModal') closeConfirmation(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); closeModal(); closeEditGroup(); closeCreateGroup(); closeConfirmation(); } });
     document.getElementById('followupInput').addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') continueSelectedTask(); });
 
     renderRoadmap();
