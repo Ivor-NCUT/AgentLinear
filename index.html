@@ -49,13 +49,15 @@
     .app {
       display: grid;
       grid-template-columns: 228px minmax(0, 1fr);
+      height: 100dvh;
       min-height: 100dvh;
+      overflow: hidden;
     }
 
     .sidebar {
       display: flex;
       flex-direction: column;
-      min-height: 100dvh;
+      min-height: 0;
       padding: 18px 14px 14px;
       background: #eceef1;
       border-right: 1px solid var(--line-strong);
@@ -143,7 +145,7 @@
     .meter > span { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--accent); transition: width .25s ease; }
     .resource-note { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
-    .main { min-width: 0; display: flex; flex-direction: column; min-height: 100dvh; }
+    .main { min-width: 0; min-height: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
     .topbar {
       display: flex;
@@ -176,6 +178,14 @@
       font-weight: 650;
       white-space: nowrap;
     }
+
+    .environment-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); cursor: pointer; font-size: 10px; font-weight: 700; }
+    .environment-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #aeb2ba; }
+    .environment-pill.checking::before { background: var(--amber); animation: breathe 1.2s ease-in-out infinite; }
+    .environment-pill.ready { color: var(--green); border-color: #cce6d9; background: var(--green-soft); }
+    .environment-pill.ready::before { background: var(--green); }
+    .environment-pill.error { color: var(--red); border-color: #efd2d2; background: var(--red-soft); }
+    .environment-pill.error::before { background: var(--red); }
 
     .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(94,106,210,.12); animation: breathe 1.8s ease-in-out infinite; }
     @keyframes breathe { 50% { box-shadow: 0 0 0 7px rgba(94,106,210,0); } }
@@ -219,7 +229,7 @@
 
     .board-wrap { min-height: 0; flex: 1; overflow: auto; padding: 14px 24px 28px; }
 
-    .view-panel { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+    .view-panel { min-height: 0; flex: 1 1 0; display: flex; flex-direction: column; overflow: hidden; }
     .view-panel.hidden { display: none; }
 
     .board {
@@ -304,6 +314,7 @@
     .task-card.queued { background: #fffdf8; }
     .task-card.canceled { opacity: .68; }
     .task-card.failed { background: #fffafa; }
+    .task-card.interrupted { background: #fffdf8; }
     .task-card.just-completed { border-color: #73b798; animation: completedGlow 2.2s ease-in-out infinite; }
 
     @keyframes completedGlow {
@@ -321,6 +332,7 @@
     .status-chip.canceled { color: var(--red); background: var(--red-soft); }
     .status-chip.failed { color: var(--red); background: var(--red-soft); }
     .status-chip.recovering { color: var(--amber); background: var(--amber-soft); }
+    .status-chip.interrupted { color: var(--amber); background: var(--amber-soft); }
     .chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
     .card-time { margin-left: auto; color: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; }
 
@@ -339,7 +351,7 @@
 
     .queue-index { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 6px; color: var(--amber); background: var(--amber-soft); font-size: 10px; font-weight: 800; }
 
-    .schedule-view { min-height: 0; flex: 1; overflow: auto; padding: 22px 24px 36px; }
+    .schedule-view { min-height: 0; height: 100%; flex: 1 1 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 22px 24px 36px; }
     .schedule-shell { width: min(1220px, 100%); margin: 0 auto; }
     .schedule-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: start; margin-bottom: 18px; }
     .schedule-intro h2 { margin: 0 0 7px; font-size: 19px; letter-spacing: -.025em; }
@@ -365,6 +377,7 @@
     .schedule-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 11px; line-height: 1.5; }
     .schedule-table tbody tr:last-child td { border-bottom: 0; }
     .schedule-table tbody tr:hover { background: #fafafd; }
+    .schedule-table .roadmap-empty { padding: 30px 18px; color: var(--muted); text-align: center; }
     .order-cell { color: var(--faint); font-family: "SFMono-Regular", Consolas, monospace; font-size: 10px; }
     .order-cell span, .order-cell a { display: block; }
     .order-cell a { margin-top: 3px; color: var(--accent); text-decoration: none; }
@@ -463,6 +476,8 @@
     .message-file { display: flex; align-items: center; gap: 7px; min-width: 180px; padding: 7px 8px; border: 1px solid #e2e4e8; border-radius: 7px; color: #4f545d; background: #f7f8f9; }
     .message-file svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--accent); }
     .message-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .message-file.missing { color: var(--red); border-color: #efd2d2; background: var(--red-soft); }
+    .message-file-remove { padding: 0; border: 0; color: inherit; background: transparent; cursor: pointer; font-size: 10px; font-weight: 700; }
     .message.user .message-file { color: #fff; border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.08); }
     .message.user .message-file svg { color: #cdd1ff; }
     .message.user .attachment-size { margin-left: auto; color: #c6c8cd; }
@@ -518,7 +533,8 @@
 
     @media (max-width: 620px) {
       body { overflow: auto; }
-      .app { display: block; }
+      .app { display: block; height: auto; min-height: 100dvh; overflow: visible; }
+      .main { height: auto; min-height: 100dvh; }
       .sidebar { display: none; }
       .topbar { position: sticky; top: 0; min-height: 58px; padding: 0 14px; }
       .title-block p { display: none; }
@@ -527,6 +543,7 @@
       .board { min-width: 0; grid-template-columns: 1fr; }
       .column { min-width: 0; }
       .schedule-view { padding: 16px 14px 28px; }
+      .view-panel, .schedule-view { height: auto; overflow: visible; }
       .schedule-intro { grid-template-columns: 1fr; gap: 10px; }
       .schedule-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
       .phase-strip { grid-template-columns: 1fr; }
@@ -561,7 +578,7 @@
         </button>
         <button class="nav-item" id="scheduleNavButton" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 2v4M16 2v4M4 9h16M8 13h3M8 17h5"/></svg>
-          <span>需求排期</span><span class="nav-count">11</span>
+          <span>需求排期</span><span class="nav-count">0</span>
         </button>
       </nav>
 
@@ -582,6 +599,7 @@
         <div class="topbar-center">
           <div class="capacity-pill"><span class="live-dot"></span><span id="capacityPill">6 个 Agent 正在工作 · 4 个等待</span></div>
         </div>
+        <button class="environment-pill" id="environmentStatus" type="button" title="检查本地运行环境">浏览器演示</button>
       </header>
 
       <section class="view-panel" id="boardView">
@@ -609,26 +627,26 @@
           <div class="schedule-shell">
             <div class="schedule-intro">
               <div>
-                <h2>AgentLinear 前端需求排期</h2>
-                <p>这张表只安排前端演示与产品逻辑确认。每项验收通过后再进入下一项；完整交互冻结后，才开始接 Codex 进程、SQLite 和文件系统后端。</p>
+                <h2>AgentLinear 本地后端 MVP 排期</h2>
+                <p>目标是让用户从 GitHub 克隆代码后即可在自己的电脑上运行。产品不依赖云端服务，不建设 SaaS；任务、会话、附件与运行结果均留在本机。</p>
               </div>
               <div class="freeze-note">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                后端暂时冻结
+                本地 MVP 已完成
               </div>
             </div>
 
             <div class="schedule-stats">
-              <div class="schedule-stat"><span>前端需求</span><strong id="roadmapTotal">11</strong><small>项</small></div>
-              <div class="schedule-stat"><span>P0 必须完成</span><strong id="roadmapP0">8</strong><small>项</small></div>
-              <div class="schedule-stat"><span>已有交互原型</span><strong id="roadmapPrototype">6</strong><small>项</small></div>
-              <div class="schedule-stat"><span>等待确认</span><strong id="roadmapConfirm">4</strong><small>项</small></div>
+              <div class="schedule-stat"><span>MVP 需求</span><strong id="roadmapTotal">0</strong><small>项</small></div>
+              <div class="schedule-stat"><span>P0 核心可用</span><strong id="roadmapP0">0</strong><small>项</small></div>
+              <div class="schedule-stat"><span>P1 发布门槛</span><strong id="roadmapP1">0</strong><small>项</small></div>
+              <div class="schedule-stat"><span>等待开发</span><strong id="roadmapConfirm">0</strong><small>项</small></div>
             </div>
 
             <div class="phase-strip">
-              <div class="phase-card" style="--phase-color:#5e6ad2"><strong>M0 · 信息架构</strong><span>导航、分组与本地文件夹关系先稳定下来。</span></div>
-              <div class="phase-card" style="--phase-color:#2e8b64"><strong>M1 · 任务闭环</strong><span>从创建、排队、执行到交付和续聊跑通。</span></div>
-              <div class="phase-card" style="--phase-color:#bf6b3b"><strong>M2 · 稳定与验收</strong><span>补齐恢复、异常状态与完整验收脚本。</span></div>
+              <div class="phase-card" style="--phase-color:#5e6ad2"><strong>M0 · 本地运行基础</strong><span>Electron + Node.js + SQLite，先跑通安装、存储和环境检查。</span></div>
+              <div class="phase-card" style="--phase-color:#2e8b64"><strong>M1 · 真实任务闭环</strong><span>接入 Codex CLI、文件夹、附件、6 并发队列与进程停止。</span></div>
+              <div class="phase-card" style="--phase-color:#bf6b3b"><strong>M2 · 可恢复、可交付</strong><span>补齐崩溃恢复、自检与面向开源用户的本地运行文档。</span></div>
             </div>
 
             <div class="schedule-table-wrap">
@@ -641,7 +659,7 @@
 
             <div class="schedule-footnote">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></svg>
-              <span>确认方式：你可以直接回复“排期确认”，也可以指出要调整的顺序、优先级或验收标准。收到确认前，不开始表内功能开发。</span>
+              <span>本地后端 MVP 已全部实现并从排期移除。完成证据保留在代码、自动化测试、架构文档与开源运行说明中。</span>
             </div>
           </div>
         </div>
@@ -673,10 +691,10 @@
         <textarea id="followupInput" aria-label="补充指令" placeholder="补充要求，Agent 会延续这张卡片的完整上下文……"></textarea>
         <div class="attachment-tray" id="followupAttachmentTray"></div>
         <div class="composer-footer">
-          <label class="attach-button" for="followupFileInput">
+          <button class="attach-button" id="followupAttachButton" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 12 5.5-5.5a3 3 0 0 1 4.2 4.2L10 18.4a5 5 0 0 1-7.1-7.1l8-8"/></svg>
             添加文件
-          </label>
+          </button>
           <input class="file-input" id="followupFileInput" type="file" multiple />
           <span class="context-note" id="contextNote">已载入 2 轮上下文</span>
           <button class="btn primary" id="continueTask" type="button">继续</button>
@@ -702,10 +720,10 @@
         <label for="taskPromptInput">第一条指令</label>
         <textarea id="taskPromptInput" required placeholder="写清楚目标、范围和你希望看到的结果……"></textarea>
         <div class="field-attachment-row">
-          <label class="attach-button" for="taskFileInput">
+          <button class="attach-button" id="taskAttachButton" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 12 5.5-5.5a3 3 0 0 1 4.2 4.2L10 18.4a5 5 0 0 1-7.1-7.1l8-8"/></svg>
             添加本地文件
-          </label>
+          </button>
           <span class="attachment-helper">可多选，文件会随本轮指令发送</span>
           <input class="file-input" id="taskFileInput" type="file" multiple />
         </div>
@@ -740,7 +758,7 @@
       <div class="field">
         <label>重新关联文件夹</label>
         <div class="field-attachment-row">
-          <label class="attach-button" for="editFolderInput">选择另一个文件夹</label>
+          <button class="attach-button" id="editFolderButton" type="button">选择另一个文件夹</button>
           <span class="attachment-helper">选择后，分组名称会使用新文件夹名</span>
           <input class="file-input" id="editFolderInput" type="file" webkitdirectory directory multiple />
         </div>
@@ -762,7 +780,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h7l2 2h9v11H3z"/></svg>
         <strong>选择项目文件夹</strong>
         <span>浏览器 Demo 只读取文件夹名称和文件数量，不会上传文件内容。</span>
-        <label class="btn" for="createFolderInput">浏览本地文件夹</label>
+        <button class="btn" id="createFolderButton" type="button">浏览本地文件夹</button>
         <input class="file-input" id="createFolderInput" type="file" webkitdirectory directory multiple />
       </div>
       <div class="folder-selection empty" id="createFolderSelection">
@@ -810,19 +828,7 @@
       { id:'devtools', name:'developer-tools', path:'~/Projects/developer-tools', color:'#7a5bb6', repos:['release-cli','catalog-search','open-sdk','api-gateway'] }
     ];
 
-    const roadmapItems = [
-      { id:'FE-01', priority:'P0', phase:'M0', title:'双视图导航与页面框架', detail:'任务看板与需求排期在同一应用内切换，页面状态互不干扰。', acceptance:'切换视图不会丢失任务、分组或输入数据；刷新后回到上次打开的页面。', status:'done' },
-      { id:'FE-02', priority:'P0', phase:'M0', title:'Session 分组与本地文件夹管理', detail:'选择文件夹创建分组，展示 basename，支持重新关联、重命名与移除空分组。', acceptance:'分组名与文件夹名保持一致；重名、目录不存在和非空删除都有明确反馈。', status:'done' },
-      { id:'FE-03', priority:'P0', phase:'M1', title:'任务创建与本地附件', detail:'从指定分组创建任务，输入首轮指令，并选择多个本地文件。', acceptance:'必填校验准确；附件可添加、删除和查看大小；任务始终进入当前分组。', status:'done' },
-      { id:'FE-04', priority:'P0', phase:'M1', title:'卡片详情与上下文续聊', detail:'在抽屉内查看完整消息、结果和附件，并继续发送后续要求。', acceptance:'每轮消息顺序正确；续聊保留历史上下文；完成任务也能再次提交。', status:'done' },
-      { id:'FE-05', priority:'P0', phase:'M1', title:'任务生命周期状态机', detail:'统一草稿、排队、运行、完成、失败和取消六种状态及可用操作。', acceptance:'每种状态只出现合法按钮；非法跳转无法触发；状态文案与颜色保持一致。', status:'done' },
-      { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'done' },
-      { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'done' },
-      { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'done' },
-      { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'done' },
-      { id:'FE-10', priority:'P1', phase:'M2', title:'异常、空白与危险操作反馈', detail:'覆盖无分组、无任务、文件失效、启动失败、队列异常和删除确认。', acceptance:'每个异常都有下一步操作；危险动作二次确认；页面不会停在无法理解的状态。', status:'done' },
-      { id:'FE-11', priority:'P1', phase:'M2', title:'完整演示脚本与产品逻辑冻结', detail:'固化从建组、提交 10 个任务、续聊、停止、恢复到查看交付的验收流程。', acceptance:'按脚本完整走一遍无断点；你确认交互后输出前端逻辑说明，再开始后端设计。', status:'done' }
-    ];
+    const roadmapItems = [];
 
     const taskStates = {
       draft:{ label:'草稿', actions:['run','cancel'] },
@@ -830,6 +836,7 @@
       running:{ label:'运行中', actions:['stop','continue'] },
       done:{ label:'已完成', actions:['continue'] },
       failed:{ label:'失败', actions:['retry','continue','cancel'] },
+      interrupted:{ label:'已中断', actions:['retry','continue'] },
       canceled:{ label:'已取消', actions:['continue'] }
     };
 
@@ -839,10 +846,12 @@
       running:['done','failed','canceled','queued'],
       done:['running','queued'],
       failed:['running','queued','canceled'],
+      interrupted:['running','queued'],
       canceled:['running','queued']
     };
 
-    let groups = loadGroups();
+    const desktopMode = Boolean(window.agentLinear?.groups);
+    let groups = desktopMode ? [] : loadGroups();
 
     const initialTasks = [
       { id:'AGT-1042', status:'running', title:'重构用户权限中间件', summary:'拆分鉴权与授权逻辑，保持现有 API 完全兼容。', repo:'acme-console', branch:'refactor/auth-middleware', time:'12:48', elapsed:'08:16', progress:64, turns:2, prompt:'帮我重构 src/middleware/auth.ts。现在鉴权、权限判断和错误响应耦合在一起，测试也很难写。请保持 API 兼容。', attachments:[{name:'auth.ts',size:8421,type:'text/typescript'},{name:'permissions.test.ts',size:12680,type:'text/typescript'}], reply:'我已经完成现状梳理：耦合点主要在 token 解析与角色判断共享可变 request 状态。正在拆出 verifyIdentity 和 authorize 两层，并补回归测试。' },
@@ -862,7 +871,7 @@
     ];
 
     let restoredFromStorage = false;
-    let tasks = loadTasks();
+    let tasks = desktopMode ? [] : loadTasks();
     let queueSequence = tasks.reduce((max, task) => Math.max(max, task.queueOrder || 0), 0);
     let selectedTaskId = null;
     let newTaskFiles = [];
@@ -883,6 +892,7 @@
     }
 
     function saveGroups() {
+      if (desktopMode) return;
       localStorage.setItem('agent-linear-groups-v1', JSON.stringify(groups));
     }
 
@@ -916,7 +926,34 @@
 
     function nextQueueOrder() { return ++queueSequence; }
 
-    function saveTasks() { localStorage.setItem('agent-linear-state-v3', JSON.stringify({ version:APP_DATA_VERSION, tasks })); }
+    function saveTasks() {
+      if (!desktopMode) localStorage.setItem('agent-linear-state-v3', JSON.stringify({ version:APP_DATA_VERSION, tasks }));
+    }
+
+    function formatDesktopTime(value) {
+      if (!value) return '';
+      return new Date(value).toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' });
+    }
+
+    function mapDesktopTask(task) {
+      const elapsed = task.status === 'done' ? `完成于 ${formatDesktopTime(task.completedAt || task.updatedAt)}`
+        : task.status === 'failed' ? '执行失败'
+        : task.status === 'interrupted' ? '异常中断'
+        : task.status === 'running' ? '运行中'
+        : task.status;
+      return {
+        ...task,
+        group:task.groupId,
+        repo:task.cwd,
+        branch:task.sessionId ? `Session ${task.sessionId.slice(0, 8)}` : '正在创建 Session',
+        queueOrder:task.queuePosition,
+        time:formatDesktopTime(task.createdAt),
+        elapsed,
+        progress:task.status === 'done' ? 100 : task.status === 'running' ? 12 : 0,
+        reply:task.finalOutput,
+        attachments:[]
+      };
+    }
 
     function activeRunningCount() { return tasks.filter(task => task.status === 'running' && !task.recoveryPending).length; }
 
@@ -951,22 +988,22 @@
       const statusMeta = {
         done:{ label:'已完成', className:'done' },
         prototype:{ label:'已有原型', className:'prototype' },
-        confirm:{ label:'待确认', className:'confirm' }
+        confirm:{ label:'待开发', className:'confirm' }
       };
-      document.getElementById('roadmapTableBody').innerHTML = roadmapItems.map((item, index) => {
+      document.getElementById('roadmapTableBody').innerHTML = roadmapItems.length ? roadmapItems.map((item, index) => {
         const status = statusMeta[item.status];
         return `<tr>
-          <td class="order-cell"><span>${String(index + 1).padStart(2, '0')}</span><a href="https://github.com/Ivor-NCUT/AgentLinear/issues/${index + 1}" target="_blank" rel="noreferrer">#${index + 1}</a></td>
+          <td class="order-cell"><span>${String(index + 1).padStart(2, '0')}</span></td>
           <td><span class="priority-badge ${item.priority.toLowerCase()}">${item.priority}</span></td>
           <td><span class="phase-badge">${item.phase}</span></td>
           <td><span class="requirement-title">${escapeHtml(item.title)}</span><span class="requirement-detail">${escapeHtml(item.detail)}</span></td>
           <td><span class="acceptance-text">${escapeHtml(item.acceptance)}</span></td>
           <td><span class="roadmap-status ${status.className}">${status.label}</span></td>
         </tr>`;
-      }).join('');
+      }).join('') : '<tr><td class="roadmap-empty" colspan="6">本地后端 MVP 已全部完成，暂无等待开发的需求。</td></tr>';
       document.getElementById('roadmapTotal').textContent = roadmapItems.length;
       document.getElementById('roadmapP0').textContent = roadmapItems.filter(item => item.priority === 'P0').length;
-      document.getElementById('roadmapPrototype').textContent = roadmapItems.filter(item => item.status === 'prototype').length;
+      document.getElementById('roadmapP1').textContent = roadmapItems.filter(item => item.priority === 'P1').length;
       document.getElementById('roadmapConfirm').textContent = roadmapItems.filter(item => item.status === 'confirm').length;
     }
 
@@ -978,8 +1015,8 @@
       document.getElementById('boardNavButton').classList.toggle('active', !showingSchedule);
       document.getElementById('scheduleNavButton').classList.toggle('active', showingSchedule);
       document.getElementById('viewTitle').textContent = showingSchedule ? '需求排期' : '任务看板';
-      document.getElementById('viewSubtitle').textContent = showingSchedule ? 'AgentLinear 前端开发计划 · 等待确认' : '本地 Codex 会话 · 自动持久化';
-      document.getElementById('capacityPill').textContent = showingSchedule ? '前端排期确认中 · 后端冻结' : `${activeRunningCount()} 个 Agent 正在工作 · ${tasks.filter(task => task.status === 'queued').length} 个等待`;
+      document.getElementById('viewSubtitle').textContent = showingSchedule ? '本地后端 MVP · 开发中' : '本地 Codex 会话 · 自动持久化';
+      document.getElementById('capacityPill').textContent = showingSchedule ? '本地优先 · 无云端服务' : `${activeRunningCount()} 个 Agent 正在工作 · ${tasks.filter(task => task.status === 'queued').length} 个等待`;
       localStorage.setItem('agent-linear-current-view', currentView);
     }
 
@@ -1076,7 +1113,7 @@
       document.getElementById('drawerMeta').innerHTML = `<span>${icons.repo}${escapeHtml(task.repo)}</span><span>${icons.branch}${escapeHtml(task.branch)}</span><span>${icons.clock}${escapeHtml(task.elapsed)}</span>`;
       document.getElementById('contextNote').textContent = `已载入 ${task.turns} 轮上下文`;
       const actions = taskStates[task.status]?.actions || [];
-      document.getElementById('completeTask').style.display = task.status === 'running' && !task.recoveryPending ? 'inline-flex' : 'none';
+      document.getElementById('completeTask').style.display = !desktopMode && task.status === 'running' && !task.recoveryPending ? 'inline-flex' : 'none';
       const stopButton = document.getElementById('stopTask');
       stopButton.style.display = actions.includes('stop') || actions.includes('cancel') ? 'inline-flex' : 'none';
       stopButton.textContent = task.status === 'queued' ? '取消排队' : task.status === 'running' ? '停止任务' : '取消任务';
@@ -1090,10 +1127,13 @@
     }
 
     function renderConversation(task, options = {}) {
-      const messages = [
+      const messages = task.messages?.length ? task.messages.map(message => {
+        const isAgent = message.role === 'assistant';
+        return `<div class="message ${isAgent ? 'agent' : 'user'}"><div class="avatar">${isAgent ? 'AL' : '我'}</div><div class="bubble"><p>${escapeHtml(message.content)}</p>${messageAttachments(message.attachments)}<div class="message-time">${isAgent ? 'Agent Linear · ' : ''}${formatDesktopTime(message.createdAt)}</div></div></div>`;
+      }) : [
         `<div class="message user"><div class="avatar">我</div><div class="bubble"><p>${escapeHtml(task.prompt)}</p>${messageAttachments(task.attachments)}<div class="message-time">${task.time}</div></div></div>`
       ];
-      if (task.reply) {
+      if (!task.messages?.length && task.reply) {
         messages.push(`<div class="message agent"><div class="avatar">AL</div><div class="bubble"><p>${escapeHtml(task.reply)}</p><div class="message-time">Agent Linear · ${task.status === 'done' ? '最终交付' : '上一轮结果'}</div></div></div>`);
       }
       if (task.followups) {
@@ -1114,9 +1154,12 @@
         messages.push(`<div class="execution-placeholder"><strong>正在等待执行槽位</strong>当前排在第 ${task.queueIndex || 1} 位，有任务结束后会自动启动。</div>`);
       } else if (task.status === 'failed') {
         messages.push('<div class="execution-placeholder"><strong>本轮执行失败</strong>历史上下文已经保留，可以直接重试或补充要求。</div>');
+      } else if (task.status === 'interrupted') {
+        messages.push('<div class="execution-placeholder"><strong>应用异常退出，本轮已中断</strong>不会自动重复修改文件。检查工作区后，可以点击“重试任务”。</div>');
       }
       const conversation = document.getElementById('conversation');
       conversation.innerHTML = messages.join('');
+      conversation.querySelectorAll('[data-remove-stored-attachment]').forEach(button => button.addEventListener('click', () => removeStoredAttachment(button.dataset.removeStoredAttachment)));
       const savedPosition = conversationScrollPositions.get(task.id);
       requestAnimationFrame(() => {
         conversation.scrollTop = options.bottom || savedPosition == null ? conversation.scrollHeight : Math.min(savedPosition, conversation.scrollHeight);
@@ -1125,7 +1168,19 @@
 
     function messageAttachments(attachments = []) {
       if (!attachments?.length) return '';
-      return `<div class="message-attachments">${attachments.map(file => `<div class="message-file">${icons.file}<span>${escapeHtml(file.name)}</span><small class="attachment-size">${formatBytes(file.size)}</small></div>`).join('')}</div>`;
+      return `<div class="message-attachments">${attachments.map(file => `<div class="message-file ${file.missing ? 'missing' : ''}">${icons.file}<span>${escapeHtml(file.name)}${file.missing ? ' · 文件已失效' : ''}</span><small class="attachment-size">${formatBytes(file.size ?? file.sizeBytes)}</small>${file.missing && file.id ? `<button class="message-file-remove" type="button" data-remove-stored-attachment="${escapeHtml(file.id)}">移除记录</button>` : ''}</div>`).join('')}</div>`;
+    }
+
+    async function removeStoredAttachment(attachmentId) {
+      if (!desktopMode || !selectedTaskId) return;
+      try {
+        await window.agentLinear.tasks.removeAttachment({ taskId:selectedTaskId, attachmentId });
+        await hydrateDesktopState();
+        openDrawer(selectedTaskId, { bottom:true });
+        toast('附件记录已移除', '只移除了 AgentLinear 中的记录，没有删除本地文件。');
+      } catch (failure) {
+        toast('无法移除附件记录', failure instanceof Error ? failure.message : String(failure));
+      }
     }
 
     function rememberConversationScroll() {
@@ -1222,10 +1277,22 @@
       if (typeof action === 'function') action();
     }
 
-    function stopSelectedTask() {
+    async function stopSelectedTask() {
       const task = tasks.find(t => t.id === selectedTaskId);
       const actions = taskStates[task?.status]?.actions || [];
       if (!task || (!actions.includes('stop') && !actions.includes('cancel'))) return;
+      if (desktopMode) {
+        try {
+          const previousStatus = task.status;
+          await window.agentLinear.tasks.stop(task.id);
+          await hydrateDesktopState();
+          openDrawer(task.id, { bottom:true });
+          toast(previousStatus === 'queued' ? '已取消排队' : '正在停止任务', previousStatus === 'queued' ? '任务已从持久队列移除。' : '正在终止对应的 Codex 进程树，完成后会自动递补队首。');
+        } catch (failure) {
+          toast('无法停止任务', failure instanceof Error ? failure.message : String(failure));
+        }
+        return;
+      }
       const previousStatus = task.status;
       const wasRunning = task.status === 'running';
       if (!transitionTask(task, 'canceled', {
@@ -1249,9 +1316,20 @@
       return true;
     }
 
-    function retrySelectedTask() {
+    async function retrySelectedTask() {
       const task = tasks.find(item => item.id === selectedTaskId);
       if (!task) return;
+      if (desktopMode) {
+        try {
+          await window.agentLinear.tasks.retry(task.id);
+          await hydrateDesktopState();
+          openDrawer(task.id, { bottom:true });
+          toast('任务已重新排队', '将沿用已有 Session；若上次尚未获得 Session ID，则创建新 Session。');
+        } catch (failure) {
+          toast('无法重试任务', failure instanceof Error ? failure.message : String(failure));
+        }
+        return;
+      }
       const wasRecovering = task.recoveryPending;
       if (wasRecovering) {
         if (!resumeRecoveredTask(task)) return;
@@ -1274,11 +1352,26 @@
       return transitionTask(task, 'queued', { elapsed:'等待 00:01', progress:0, queueOrder:nextQueueOrder() });
     }
 
-    function continueSelectedTask() {
+    async function continueSelectedTask() {
       const task = tasks.find(t => t.id === selectedTaskId);
       const input = document.getElementById('followupInput');
       const message = input.value.trim();
       if (!task || (!message && !followupFiles.length)) { input.focus(); return; }
+      if (desktopMode) {
+        try {
+          await window.agentLinear.tasks.followup({ taskId:task.id, prompt:message, attachmentPaths:followupFiles.map(file => file.path) });
+          input.value = '';
+          followupFiles = [];
+          document.getElementById('followupFileInput').value = '';
+          renderAttachmentTray('followupAttachmentTray', followupFiles, 'followup');
+          await hydrateDesktopState();
+          openDrawer(task.id, { bottom:true });
+          toast('上下文已恢复', `第 ${tasks.find(item => item.id === task.id)?.turns || task.turns + 1} 轮已开始执行。`);
+        } catch (failure) {
+          toast('无法继续任务', failure instanceof Error ? failure.message : String(failure));
+        }
+        return;
+      }
       task.followups = task.followups || [];
       task.followups.push({ text:message, attachments:followupFiles.map(serializeFile) });
       task.turns += 1;
@@ -1294,7 +1387,7 @@
       toast('上下文已恢复', task.status === 'running' ? `第 ${task.turns} 轮已开始执行。` : `第 ${task.turns} 轮已进入队列，历史上下文不会丢失。`);
     }
 
-    function createTask(event) {
+    async function createTask(event) {
       event.preventDefault();
       const groupId = document.getElementById('taskGroupId').value;
       const group = groups.find(item => item.id === groupId);
@@ -1313,6 +1406,18 @@
       if (!prompt) {
         error.textContent = '请填写第一条指令。';
         document.getElementById('taskPromptInput').focus();
+        return;
+      }
+      if (desktopMode) {
+        try {
+          const created = await window.agentLinear.tasks.create({ groupId, title, prompt, attachmentPaths:newTaskFiles.map(file => file.path) });
+          closeModal();
+          await hydrateDesktopState();
+          openDrawer(created.id, { bottom:true });
+          toast('任务已启动', '已创建真实 Codex 会话，正在后台静默执行。');
+        } catch (failure) {
+          error.textContent = failure instanceof Error ? failure.message : String(failure);
+        }
         return;
       }
       const runningCount = activeRunningCount();
@@ -1378,7 +1483,7 @@
       document.getElementById('editGroupError').textContent = '';
       document.getElementById('editFolderInput').value = '';
       const removeButton = document.getElementById('removeGroupButton');
-      const taskCount = tasks.filter(task => task.group === group.id).length;
+      const taskCount = desktopMode ? group.taskCount : tasks.filter(task => task.group === group.id).length;
       removeButton.textContent = taskCount ? `包含 ${taskCount} 个任务，无法移除` : '移除空分组';
       removeButton.disabled = taskCount > 0;
       updateGroupPathPreview();
@@ -1392,9 +1497,10 @@
       removeGroupArmed = false;
     }
 
-    function renamedPath(path, name) {
-      const parent = path.replace(/\/+[^/]+\/?$/, '');
-      return `${parent}/${name}`;
+    function renamedPath(folderPath, name) {
+      const normalized = folderPath.replace(/[\\/]+$/, '');
+      const separatorIndex = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'));
+      return `${normalized.slice(0, separatorIndex + 1)}${name}`;
     }
 
     function updateGroupPathPreview() {
@@ -1406,7 +1512,7 @@
       document.getElementById('editGroupError').textContent = '';
     }
 
-    function saveGroupRename(event) {
+    async function saveGroupRename(event) {
       event.preventDefault();
       const group = groups.find(item => item.id === document.getElementById('editGroupId').value);
       const name = document.getElementById('editGroupName').value.trim();
@@ -1423,12 +1529,23 @@
       }
       const oldPath = group.path;
       const relinked = Boolean(pendingEditFolder);
-      group.name = name;
-      group.path = nextPath;
-      saveGroups();
+      if (desktopMode) {
+        try {
+          const updated = await window.agentLinear.groups.update({ id:group.id, folderPath:pendingEditFolder?.path || null, name });
+          groups = groups.map(item => item.id === group.id ? updated : item);
+        } catch (failure) {
+          error.textContent = failure instanceof Error ? failure.message : String(failure);
+          return;
+        }
+      } else {
+        group.name = name;
+        group.path = nextPath;
+        saveGroups();
+      }
+      const updatedGroup = groups.find(item => item.id === group.id);
       closeEditGroup();
       render();
-      toast(relinked ? '文件夹已重新关联' : '分组已重命名', `${oldPath} → ${group.path}`);
+      toast(relinked ? '文件夹已重新关联' : '分组已重命名', `${oldPath} → ${updatedGroup.path}`);
     }
 
     function folderFromSelection(fileList) {
@@ -1437,6 +1554,34 @@
       const relativePath = files[0].webkitRelativePath || files[0].name;
       const name = relativePath.split('/').filter(Boolean)[0];
       return name ? { name, path:`~/Projects/${name}`, fileCount:files.length } : null;
+    }
+
+    function folderFromPath(folderPath) {
+      const normalized = String(folderPath || '').replace(/[\\/]+$/, '');
+      const name = normalized.split(/[\\/]/).filter(Boolean).at(-1);
+      return name ? { name, path:normalized, fileCount:null } : null;
+    }
+
+    async function chooseFolder(scope) {
+      if (!desktopMode) {
+        document.getElementById(scope === 'create' ? 'createFolderInput' : 'editFolderInput').click();
+        return;
+      }
+      try {
+        const selectedPath = await window.agentLinear.pickFolder();
+        if (!selectedPath) return;
+        const folder = folderFromPath(selectedPath);
+        if (scope === 'create') {
+          pendingCreateFolder = folder;
+          renderCreateFolderSelection();
+        } else {
+          pendingEditFolder = folder;
+          document.getElementById('editGroupName').value = folder.name;
+          updateGroupPathPreview();
+        }
+      } catch (failure) {
+        document.getElementById(scope === 'create' ? 'createGroupError' : 'editGroupError').textContent = failure instanceof Error ? failure.message : String(failure);
+      }
     }
 
     function openCreateGroup() {
@@ -1455,8 +1600,7 @@
       pendingCreateFolder = null;
     }
 
-    function selectCreateFolder(fileList) {
-      pendingCreateFolder = folderFromSelection(fileList);
+    function renderCreateFolderSelection() {
       const selection = document.getElementById('createFolderSelection');
       const error = document.getElementById('createGroupError');
       if (!pendingCreateFolder) {
@@ -1467,11 +1611,17 @@
       const duplicate = groups.find(group => group.name.toLowerCase() === pendingCreateFolder.name.toLowerCase() || group.path.toLowerCase() === pendingCreateFolder.path.toLowerCase());
       error.textContent = duplicate ? `“${duplicate.name}”已经关联到看板。` : '';
       selection.classList.remove('empty');
-      selection.innerHTML = `${icons.folder}<span>${escapeHtml(pendingCreateFolder.path)} · ${pendingCreateFolder.fileCount} 个文件</span>`;
+      const detail = pendingCreateFolder.fileCount === null ? pendingCreateFolder.path : `${pendingCreateFolder.path} · ${pendingCreateFolder.fileCount} 个文件`;
+      selection.innerHTML = `${icons.folder}<span>${escapeHtml(detail)}</span>`;
       document.getElementById('confirmCreateGroup').disabled = Boolean(duplicate);
     }
 
-    function createGroup(event) {
+    function selectCreateFolder(fileList) {
+      pendingCreateFolder = folderFromSelection(fileList);
+      renderCreateFolderSelection();
+    }
+
+    async function createGroup(event) {
       event.preventDefault();
       if (!pendingCreateFolder) return;
       const duplicate = groups.find(group => group.name.toLowerCase() === pendingCreateFolder.name.toLowerCase() || group.path.toLowerCase() === pendingCreateFolder.path.toLowerCase());
@@ -1479,10 +1629,19 @@
         document.getElementById('createGroupError').textContent = `“${duplicate.name}”已经关联到看板。`;
         return;
       }
-      const colors = ['#5e6ad2','#2e8b64','#bf6b3b','#7a5bb6','#3b7fbf','#a85c72'];
       const folderPath = pendingCreateFolder.path;
-      groups.push({ id:`group-${Date.now()}`, name:pendingCreateFolder.name, path:folderPath, color:colors[groups.length % colors.length], repos:[] });
-      saveGroups();
+      if (desktopMode) {
+        try {
+          groups.push(await window.agentLinear.groups.create(folderPath));
+        } catch (failure) {
+          document.getElementById('createGroupError').textContent = failure instanceof Error ? failure.message : String(failure);
+          return;
+        }
+      } else {
+        const colors = ['#5e6ad2','#2e8b64','#bf6b3b','#7a5bb6','#3b7fbf','#a85c72'];
+        groups.push({ id:`group-${Date.now()}`, name:pendingCreateFolder.name, path:folderPath, color:colors[groups.length % colors.length], repos:[] });
+        saveGroups();
+      }
       closeCreateGroup();
       render();
       toast('分组已创建', `${folderPath} 已加入看板。`);
@@ -1498,10 +1657,10 @@
       updateGroupPathPreview();
     }
 
-    function removeSelectedGroup() {
+    async function removeSelectedGroup() {
       const groupId = document.getElementById('editGroupId').value;
       const group = groups.find(item => item.id === groupId);
-      const taskCount = tasks.filter(task => task.group === groupId).length;
+      const taskCount = desktopMode ? group?.taskCount : tasks.filter(task => task.group === groupId).length;
       if (!group) return;
       if (taskCount) {
         document.getElementById('editGroupError').textContent = `该分组仍有 ${taskCount} 个任务，请先处理任务后再移除。`;
@@ -1511,6 +1670,14 @@
         removeGroupArmed = true;
         document.getElementById('removeGroupButton').textContent = '再次点击，确认移除';
         return;
+      }
+      if (desktopMode) {
+        try {
+          await window.agentLinear.groups.remove(groupId);
+        } catch (failure) {
+          document.getElementById('editGroupError').textContent = failure instanceof Error ? failure.message : String(failure);
+          return;
+        }
       }
       groups = groups.filter(item => item.id !== groupId);
       saveGroups();
@@ -1538,6 +1705,19 @@
       if (scope === 'task') newTaskFiles = merged;
       else followupFiles = merged;
       renderAttachmentTray(scope === 'task' ? 'taskAttachmentTray' : 'followupAttachmentTray', merged, scope);
+    }
+
+    async function chooseTaskFiles(scope) {
+      if (!desktopMode) {
+        document.getElementById(scope === 'task' ? 'taskFileInput' : 'followupFileInput').click();
+        return;
+      }
+      try {
+        const files = await window.agentLinear.pickFiles();
+        addSelectedFiles(scope, files);
+      } catch (failure) {
+        toast('无法选择文件', failure instanceof Error ? failure.message : String(failure));
+      }
     }
 
     function renderAttachmentTray(targetId, files, scope) {
@@ -1568,10 +1748,72 @@
       return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
     }
 
+    async function checkDesktopEnvironment(showResult = false) {
+      const indicator = document.getElementById('environmentStatus');
+      if (!window.agentLinear?.checkEnvironment) {
+        indicator.textContent = '浏览器演示';
+        indicator.className = 'environment-pill';
+        return;
+      }
+
+      indicator.textContent = '检查环境…';
+      indicator.className = 'environment-pill checking';
+      try {
+        const result = await window.agentLinear.checkEnvironment();
+        indicator.textContent = result.ok ? 'Codex 已就绪' : '环境需处理';
+        indicator.className = `environment-pill ${result.ok ? 'ready' : 'error'}`;
+        const failed = result.checks.find(check => check.status === 'error');
+        indicator.title = failed ? `${failed.summary}。${failed.action}` : result.checks.map(check => check.summary).join(' · ');
+        if (showResult || failed) toast(result.ok ? '本地环境检查通过' : failed.summary, result.ok ? 'Codex CLI 已安装并登录，数据目录可读写。' : failed.action);
+      } catch (error) {
+        indicator.textContent = '检查失败';
+        indicator.className = 'environment-pill error';
+        indicator.title = error instanceof Error ? error.message : String(error);
+        if (showResult) toast('环境检查失败', indicator.title);
+      }
+    }
+
+    async function hydrateDesktopState() {
+      if (!desktopMode) return;
+      try {
+        const [storedGroups, storedTasks] = await Promise.all([
+          window.agentLinear.groups.list(),
+          window.agentLinear.tasks.list()
+        ]);
+        groups = storedGroups;
+        tasks = storedTasks.map(mapDesktopTask);
+        render();
+      } catch (failure) {
+        toast('无法读取本地分组', failure instanceof Error ? failure.message : String(failure));
+      }
+    }
+
+    async function showStartupRecoveryReport() {
+      if (!desktopMode) return;
+      try {
+        const report = await window.agentLinear.getRecoveryReport();
+        if (!report || (!report.interrupted && !report.requeued && !report.orphanProcessesStopped && !report.unrecognizedProcessesSkipped)) return;
+        const parts = [
+          report.interrupted ? `${report.interrupted} 个任务标记中断` : '',
+          report.requeued ? `${report.requeued} 个任务恢复排队` : '',
+          report.orphanProcessesStopped ? `${report.orphanProcessesStopped} 个残留进程已清理` : '',
+          report.unrecognizedProcessesSkipped ? `${report.unrecognizedProcessesSkipped} 个可疑 PID 未误杀` : ''
+        ].filter(Boolean);
+        toast('已完成启动恢复', parts.join(' · '));
+      } catch (failure) {
+        toast('无法读取恢复报告', failure instanceof Error ? failure.message : String(failure));
+      }
+    }
+
     document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
     document.getElementById('boardNavButton').addEventListener('click', () => switchView('board'));
     document.getElementById('scheduleNavButton').addEventListener('click', () => switchView('schedule'));
+    document.getElementById('environmentStatus').addEventListener('click', () => checkDesktopEnvironment(true));
     document.getElementById('addGroupButton').addEventListener('click', openCreateGroup);
+    document.getElementById('taskAttachButton').addEventListener('click', () => chooseTaskFiles('task'));
+    document.getElementById('followupAttachButton').addEventListener('click', () => chooseTaskFiles('followup'));
+    document.getElementById('createFolderButton').addEventListener('click', () => chooseFolder('create'));
+    document.getElementById('editFolderButton').addEventListener('click', () => chooseFolder('edit'));
     document.getElementById('soundToggleButton').addEventListener('click', toggleSound);
     document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
     document.getElementById('stopTask').addEventListener('click', requestStopSelectedTask);
@@ -1608,6 +1850,16 @@
     renderRoadmap();
     render();
     switchView(currentView);
+    void checkDesktopEnvironment();
+    void hydrateDesktopState().then(showStartupRecoveryReport);
+    if (desktopMode) window.agentLinear.tasks.onChanged(async changed => {
+      const wasSelected = selectedTaskId === changed.id;
+      await hydrateDesktopState();
+      const updated = tasks.find(task => task.id === changed.id);
+      if (wasSelected && updated) openDrawer(updated.id, { bottom:true });
+      if (updated?.status === 'done') notifyCompletion(updated);
+      if (updated?.status === 'failed') toast('任务执行失败', updated.summary);
+    });
   </script>
 </body>
 </html>

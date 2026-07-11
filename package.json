@@ -1,0 +1,30 @@
+{
+  "name": "agentlinear",
+  "productName": "AgentLinear",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ivor-NCUT/AgentLinear.git"
+  },
+  "homepage": "https://github.com/Ivor-NCUT/AgentLinear#readme",
+  "bugs": {
+    "url": "https://github.com/Ivor-NCUT/AgentLinear/issues"
+  },
+  "description": "A local-first desktop board for parallel Codex sessions.",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "doctor": "node scripts/doctor.mjs",
+    "check": "node --check src/main.js && node --check src/attachment-service.js && node --check src/codex-adapter.js && node --check src/database.js && node --check src/environment.js && node --check src/group-service.js && node --check src/recovery.js && node --check src/scheduler.js && node --check src/task-service.js && node --check src/preload.cjs && node --check scripts/doctor.mjs && node --test tests/*.test.mjs && node tests/verify-demo.mjs",
+    "test": "node --test tests/*.test.mjs && node tests/verify-demo.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "electron": "43.1.0"
+  }
+}
