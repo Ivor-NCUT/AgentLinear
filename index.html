@@ -215,6 +215,7 @@
     .board-context svg { width: 14px; height: 14px; }
     .toolbar-spacer { flex: 1; }
     .toolbar-note { color: var(--muted); font-size: 12px; }
+    .sound-toggle[aria-pressed="false"] { color: var(--muted); background: var(--surface-soft); }
 
     .board-wrap { min-height: 0; flex: 1; overflow: auto; padding: 14px 24px 28px; }
 
@@ -587,6 +588,7 @@
           </div>
           <div class="toolbar-spacer"></div>
           <span class="toolbar-note">单击卡片查看会话 · 状态变更自动保存</span>
+          <button class="btn sound-toggle" id="soundToggleButton" type="button" aria-pressed="true">声音开启</button>
           <button class="btn" id="addGroupButton" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7h7l2 2h9v10H3z"/><path d="M17 12v5M14.5 14.5h5"/></svg>
             添加分组
@@ -653,6 +655,7 @@
         <span class="card-id" id="drawerId">AGT-1042</span>
         <span class="status-chip running" id="drawerStatus"><span class="chip-dot"></span>运行中</span>
         <div class="drawer-actions">
+          <button class="btn" id="completeTask" type="button">演示完成</button>
           <button class="btn" id="retryTask" type="button">重试任务</button>
           <button class="btn danger" id="stopTask" type="button">停止任务</button>
         </div>
@@ -799,7 +802,7 @@
       { id:'FE-05', priority:'P0', phase:'M1', title:'任务生命周期状态机', detail:'统一草稿、排队、运行、完成、失败和取消六种状态及可用操作。', acceptance:'每种状态只出现合法按钮；非法跳转无法触发；状态文案与颜色保持一致。', status:'done' },
       { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'done' },
       { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'done' },
-      { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'confirm' },
+      { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'done' },
       { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'prototype' },
       { id:'FE-10', priority:'P1', phase:'M2', title:'异常、空白与危险操作反馈', detail:'覆盖无分组、无任务、文件失效、启动失败、队列异常和删除确认。', acceptance:'每个异常都有下一步操作；危险动作二次确认；页面不会停在无法理解的状态。', status:'confirm' },
       { id:'FE-11', priority:'P1', phase:'M2', title:'完整演示脚本与产品逻辑冻结', detail:'固化从建组、提交 10 个任务、续聊、停止、恢复到查看交付的验收流程。', acceptance:'按脚本完整走一遍无断点；你确认交互后输出前端逻辑说明，再开始后端设计。', status:'confirm' }
@@ -848,6 +851,7 @@
     let newTaskFiles = [];
     let followupFiles = [];
     let currentView = localStorage.getItem('agent-linear-current-view') === 'schedule' ? 'schedule' : 'board';
+    let soundEnabled = localStorage.getItem('agent-linear-sound-enabled') !== 'false';
     let pendingCreateFolder = null;
     let pendingEditFolder = null;
     let removeGroupArmed = false;
@@ -966,6 +970,9 @@
       document.getElementById('allCount').textContent = tasks.length;
       document.getElementById('capacityText').textContent = `${running} / ${MAX_CONCURRENT_TASKS}`;
       document.getElementById('capacityBar').style.width = `${running / MAX_CONCURRENT_TASKS * 100}%`;
+      const soundButton = document.getElementById('soundToggleButton');
+      soundButton.textContent = soundEnabled ? '声音开启' : '已静音';
+      soundButton.setAttribute('aria-pressed', String(soundEnabled));
       if (currentView === 'board') document.getElementById('capacityPill').textContent = `${running} 个 Agent 正在工作 · ${queued} 个等待`;
 
       document.querySelectorAll('.task-card').forEach(card => card.addEventListener('click', () => openDrawer(card.dataset.id)));
@@ -1023,6 +1030,12 @@
       selectedTaskId = id;
       const task = tasks.find(t => t.id === id);
       if (!task) return;
+      if (task.unreadCompletion) {
+        task.unreadCompletion = false;
+        task.justCompleted = false;
+        document.querySelector(`[data-id="${task.id}"]`)?.classList.remove('just-completed');
+        saveTasks();
+      }
       document.getElementById('drawerId').textContent = task.id;
       document.getElementById('drawerTitle').textContent = task.title;
       const status = document.getElementById('drawerStatus');
@@ -1031,6 +1044,7 @@
       document.getElementById('drawerMeta').innerHTML = `<span>${icons.repo}${escapeHtml(task.repo)}</span><span>${icons.branch}${escapeHtml(task.branch)}</span><span>${icons.clock}${escapeHtml(task.elapsed)}</span>`;
       document.getElementById('contextNote').textContent = `已载入 ${task.turns} 轮上下文`;
       const actions = taskStates[task.status]?.actions || [];
+      document.getElementById('completeTask').style.display = task.status === 'running' ? 'inline-flex' : 'none';
       const stopButton = document.getElementById('stopTask');
       stopButton.style.display = actions.includes('stop') || actions.includes('cancel') ? 'inline-flex' : 'none';
       stopButton.textContent = task.status === 'queued' ? '取消排队' : task.status === 'running' ? '停止任务' : '取消任务';
@@ -1055,6 +1069,9 @@
           const attachments = typeof item === 'string' ? [] : item.attachments;
           messages.push(`<div class="message user"><div class="avatar">我</div><div class="bubble">${text ? `<p>${escapeHtml(text)}</p>` : ''}${messageAttachments(attachments)}<div class="message-time">刚刚</div></div></div>`);
         });
+      }
+      if (task.finalResult) {
+        messages.push(`<div class="message agent"><div class="avatar">AL</div><div class="bubble"><p>${escapeHtml(task.finalResult)}</p><div class="message-time">Agent Linear · 最终交付</div></div></div>`);
       }
       if (task.status === 'running') {
         messages.push('<div class="execution-placeholder"><div class="quiet-bars"><i></i><i></i><i></i></div><strong>Agent 正在静默执行</strong>本轮完成后，将一次性展示最终结果。</div>');
@@ -1090,6 +1107,58 @@
       followupFiles = [];
       renderAttachmentTray('followupAttachmentTray', followupFiles, 'followup');
       selectedTaskId = null;
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem('agent-linear-sound-enabled', String(soundEnabled));
+      render();
+      toast(soundEnabled ? '声音提醒已开启' : '已静音', soundEnabled ? '任务完成时会播放短提示音。' : '任务仍会高亮，但不会播放声音。');
+    }
+
+    function playCompletionSound() {
+      if (!soundEnabled) return false;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return false;
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.frequency.value = 720;
+        gain.gain.setValueAtTime(0.0001, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.22);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.24);
+        return true;
+      } catch { return false; }
+    }
+
+    function notifyCompletion(task) {
+      if (!task || task.completionNotified) return false;
+      task.completionNotified = true;
+      playCompletionSound();
+      toast('任务已完成', `${task.id}「${task.title}」已生成最终交付。`);
+      saveTasks();
+      return true;
+    }
+
+    function completeSelectedTask() {
+      const task = tasks.find(item => item.id === selectedTaskId);
+      if (!task || !transitionTask(task, 'done', {
+        elapsed:`完成于 ${new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`,
+        progress:100,
+        summary:'任务已完成，最终交付等待查看。',
+        finalResult:'已完成本轮任务。代码修改、验证结果和后续建议已经整理完毕。',
+        justCompleted:true,
+        unreadCompletion:true,
+        completionNotified:false
+      })) return;
+      closeDrawer();
+      promoteNextTask();
+      render();
+      notifyCompletion(task);
     }
 
     function stopSelectedTask() {
@@ -1425,8 +1494,10 @@
     document.getElementById('boardNavButton').addEventListener('click', () => switchView('board'));
     document.getElementById('scheduleNavButton').addEventListener('click', () => switchView('schedule'));
     document.getElementById('addGroupButton').addEventListener('click', openCreateGroup);
+    document.getElementById('soundToggleButton').addEventListener('click', toggleSound);
     document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
     document.getElementById('stopTask').addEventListener('click', stopSelectedTask);
+    document.getElementById('completeTask').addEventListener('click', completeSelectedTask);
     document.getElementById('retryTask').addEventListener('click', retrySelectedTask);
     document.getElementById('continueTask').addEventListener('click', continueSelectedTask);
     document.getElementById('cancelNewTask').addEventListener('click', closeModal);
