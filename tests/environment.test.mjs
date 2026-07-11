@@ -19,7 +19,7 @@ test('reports a ready local Codex environment', () => {
     const result = runEnvironmentPreflight({ dataDirectory: root, workspacePath: root, runCommand, nodeVersion: 'v22.16.0' });
     assert.equal(result.ok, true);
     assert.equal(result.codexExecutable, 'codex');
-    assert.equal(result.checks.length, 5);
+    assert.equal(result.checks.length, 6);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -87,6 +87,22 @@ test('gives an explicit Codex path priority over PATH discovery', () => {
     assert.equal(result.ok, true);
     assert.equal(result.codexExecutable, configured);
     assert.equal(commands.includes('codex'), false);
+  } finally {
+    fs.rmSync(root, { recursive:true, force:true });
+  }
+});
+
+test('rejects a Codex CLI that cannot provide the interactive app-server protocol', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlinear-env-'));
+  const runCommand = (_command, args) => {
+    if (args[0] === '--version') return commandResult(0, 'codex-cli old\n');
+    if (args[0] === 'app-server') return commandResult(2, '', 'unknown command app-server');
+    return commandResult(0, 'Logged in');
+  };
+  try {
+    const result = runEnvironmentPreflight({ dataDirectory:root, runCommand, nodeVersion:'v22.16.0' });
+    assert.equal(result.ok, false);
+    assert.match(result.checks.find(check => check.id === 'codex-app-server').action, /升级 Codex CLI/);
   } finally {
     fs.rmSync(root, { recursive:true, force:true });
   }

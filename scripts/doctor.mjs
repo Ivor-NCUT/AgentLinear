@@ -52,7 +52,7 @@ export function runDoctor({
       checkDependencies(root)
     ];
     const environment = preflight({ dataDirectory:temporaryDirectory });
-    checks.push(...environment.checks.filter(check => ['node', 'codex-cli', 'codex-auth'].includes(check.id)));
+    checks.push(...environment.checks.filter(check => ['node', 'codex-cli', 'codex-app-server', 'codex-auth'].includes(check.id)));
     return {
       ok:checks.every(check => check.status === 'ok'),
       localOnly:true,

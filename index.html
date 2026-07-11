@@ -1792,12 +1792,14 @@
       if (!desktopMode) return;
       try {
         const report = await window.agentLinear.getRecoveryReport();
-        if (!report || (!report.interrupted && !report.requeued && !report.orphanProcessesStopped && !report.unrecognizedProcessesSkipped)) return;
+        if (!report || (!report.interrupted && !report.requeued && !report.orphanProcessesStopped && !report.unrecognizedProcessesSkipped && !report.sessionsMigrated && !report.sessionMigrationFailures?.length)) return;
         const parts = [
           report.interrupted ? `${report.interrupted} 个任务标记中断` : '',
           report.requeued ? `${report.requeued} 个任务恢复排队` : '',
           report.orphanProcessesStopped ? `${report.orphanProcessesStopped} 个残留进程已清理` : '',
-          report.unrecognizedProcessesSkipped ? `${report.unrecognizedProcessesSkipped} 个可疑 PID 未误杀` : ''
+          report.unrecognizedProcessesSkipped ? `${report.unrecognizedProcessesSkipped} 个可疑 PID 未误杀` : '',
+          report.sessionsMigrated ? `${report.sessionsMigrated} 个旧会话已迁移到客户端记录` : '',
+          report.sessionMigrationFailures?.length ? `${report.sessionMigrationFailures.length} 个旧会话等待下次迁移` : ''
         ].filter(Boolean);
         toast('已完成启动恢复', parts.join(' · '));
       } catch (failure) {

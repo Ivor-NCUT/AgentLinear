@@ -9,13 +9,14 @@ import { createGroupService } from '../src/group-service.js';
 import { createTaskService } from '../src/task-service.js';
 import { createPersistentScheduler } from '../src/scheduler.js';
 
-async function fixture(results) {
+async function fixture(results, { preparedSessionId = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlinear-tasks-'));
   const workspace = path.join(root, 'project');
   fs.mkdirSync(workspace);
   const storage = await openAgentLinearDatabase({ filePath:path.join(root, 'data.sqlite3') });
   const group = createGroupService(storage.database).create(workspace);
   const calls = [];
+  const prepareCalls = [];
   const changed = [];
   const adapter = {
     async execute(input) {
@@ -23,6 +24,13 @@ async function fixture(results) {
       const result = results.shift();
       if (result instanceof Error) throw result;
       return result;
+    },
+    async prepareSession(input) {
+      prepareCalls.push(input);
+      return {
+        sessionId:preparedSessionId || input.sessionId,
+        migratedFromSessionId:preparedSessionId ? input.sessionId : null
+      };
     }
   };
   const service = createTaskService({
@@ -38,7 +46,7 @@ async function fixture(results) {
     onChanged:task => changed.push(task)
   });
   service.setScheduler(scheduler);
-  return { root, workspace, storage, group, calls, changed, service, scheduler };
+  return { root, workspace, storage, group, calls, prepareCalls, changed, service, scheduler };
 }
 
 function cleanup(context) {
@@ -59,6 +67,7 @@ test('persists a first turn, Session ID, run and final answer', async () => {
     assert.deepEqual(completed.messages.map(message => message.role), ['user','assistant']);
     assert.equal(context.storage.database.prepare('SELECT status FROM runs WHERE task_id = ?').get(started.id).status, 'completed');
     assert.equal(context.calls[0].executable, '/local/codex');
+    assert.equal(context.calls[0].threadName, 'Real task');
   } finally {
     cleanup(context);
   }
@@ -80,6 +89,28 @@ test('resumes the same Codex Session and appends immutable history', async () =>
     assert.equal(completed.finalOutput, 'ORCHID-742');
     assert.equal(context.calls[1].sessionId, 'thread-1');
     assert.deepEqual(completed.messages.map(message => message.content), ['Remember ORCHID-742','remembered','What was it?','ORCHID-742']);
+  } finally {
+    cleanup(context);
+  }
+});
+
+test('migrates persisted legacy Sessions at startup without adding a message', async () => {
+  const context = await fixture(
+    [{ sessionId:'thread-legacy', finalOutput:'legacy result', exitCode:0, stderr:'', usage:{} }],
+    { preparedSessionId:'thread-visible' }
+  );
+  try {
+    const started = context.service.create({ groupId:context.group.id, title:'Legacy card', prompt:'Old request' });
+    await context.scheduler.waitForIdle();
+    const beforeMessages = context.service.get(started.id).messages.length;
+    const report = await context.service.migrateLegacySessions();
+    assert.deepEqual(report, { examined:1, migrated:1, failures:[] });
+    assert.equal(context.service.get(started.id).sessionId, 'thread-visible');
+    assert.equal(context.service.get(started.id).messages.length, beforeMessages);
+    assert.equal(context.prepareCalls[0].threadName, 'Legacy card');
+    assert.equal(context.prepareCalls[0].sessionId, 'thread-legacy');
+    assert.deepEqual(await context.service.migrateLegacySessions(), { examined:0, migrated:0, failures:[] });
+    assert.equal(context.prepareCalls.length, 1);
   } finally {
     cleanup(context);
   }

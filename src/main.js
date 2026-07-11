@@ -171,6 +171,12 @@ app.whenReady().then(async () => {
     onChanged: broadcastTaskChange,
     onError: error => console.error('[AgentLinear task]', error)
   });
+  const sessionMigration = await taskService.migrateLegacySessions();
+  startupRecoveryReport = {
+    ...startupRecoveryReport,
+    sessionsMigrated:sessionMigration.migrated,
+    sessionMigrationFailures:sessionMigration.failures
+  };
   scheduler = createPersistentScheduler({
     database: storage.database,
     executeTask: taskId => taskService.executeQueued(taskId),
