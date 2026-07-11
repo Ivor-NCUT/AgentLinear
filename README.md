@@ -102,8 +102,18 @@ Desktop UI
 
 ```text
 AgentLinear/
-├── index.html   高保真交互 Demo，包含样式、数据与前端逻辑
-└── README.md    产品说明、运行方式与后续架构
+├── index.html                  高保真交互 Demo，包含样式、数据与前端逻辑
+├── docs/
+│   ├── FRONTEND_LOGIC.md       已冻结的前端产品逻辑
+│   └── FRONTEND_ACCEPTANCE.md  完整人工验收脚本
+├── tests/verify-demo.mjs       可重复运行的静态验证
+└── README.md                   产品说明、运行方式与后续架构
+```
+
+运行验证：
+
+```bash
+node tests/verify-demo.mjs
 ```
 
 ## 设计原则
