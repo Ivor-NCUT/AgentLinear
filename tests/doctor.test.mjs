@@ -9,7 +9,7 @@ import { formatDoctorReport, runDoctor } from '../scripts/doctor.mjs';
 function readyPreflight() {
   return {
     checks:[
-      { id:'node', status:'ok', summary:'Node.js 22.12.0', action:'' },
+      { id:'node', status:'ok', summary:'Node.js 22.16.0', action:'' },
       { id:'codex-cli', status:'ok', summary:'codex-cli 1.0.0', action:'' },
       { id:'codex-auth', status:'ok', summary:'Logged in', action:'' }
     ]

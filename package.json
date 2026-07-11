@@ -22,7 +22,7 @@
     "test": "node --experimental-sqlite --test tests/*.test.mjs && node tests/verify-demo.mjs"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.16.0"
   },
   "devDependencies": {
     "electron": "43.1.0"

@@ -4,7 +4,7 @@
 
 ## 开发环境
 
-1. 安装 Node.js 22.12 或更高版本，并安装、登录 Codex CLI。
+1. 安装 Node.js 22.16 或更高版本，并安装、登录 Codex CLI。
 2. 克隆仓库后运行 `npm ci`。
 3. 运行 `npm run doctor` 检查本地环境。
 4. 运行 `npm start` 启动桌面应用。

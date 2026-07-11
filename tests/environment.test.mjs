@@ -16,7 +16,7 @@ test('reports a ready local Codex environment', () => {
     ? commandResult(0, 'codex-cli 1.2.3\n')
     : commandResult(0, 'Logged in using ChatGPT\n');
   try {
-    const result = runEnvironmentPreflight({ dataDirectory: root, workspacePath: root, runCommand, nodeVersion: 'v22.12.0' });
+    const result = runEnvironmentPreflight({ dataDirectory: root, workspacePath: root, runCommand, nodeVersion: 'v22.16.0' });
     assert.equal(result.ok, true);
     assert.equal(result.codexExecutable, 'codex');
     assert.equal(result.checks.length, 5);
@@ -33,7 +33,7 @@ test('returns actionable failures for missing Codex and invalid workspace', () =
       dataDirectory: root,
       workspacePath: path.join(root, 'missing'),
       runCommand,
-      nodeVersion: 'v22.12.0'
+      nodeVersion: 'v22.16.0'
     });
     assert.equal(result.ok, false);
     assert.match(result.checks.find(check => check.id === 'workspace').action, /文件夹/);
@@ -58,13 +58,13 @@ test('detects an unauthenticated Codex CLI', () => {
   }
 });
 
-test('rejects unsupported Node.js versions', () => {
+test('rejects Node.js versions without sqlite.backup support', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlinear-env-'));
   const runCommand = (_command, args) => args[0] === '--version'
     ? commandResult(0, 'codex-cli 1.2.3\n')
     : commandResult(0, 'Logged in');
   try {
-    const result = runEnvironmentPreflight({ dataDirectory: root, runCommand, nodeVersion: 'v20.11.0' });
+    const result = runEnvironmentPreflight({ dataDirectory: root, runCommand, nodeVersion: 'v22.15.0' });
     assert.equal(result.ok, false);
     assert.match(result.checks.find(check => check.id === 'node').action, /升级 Node.js/);
   } finally {

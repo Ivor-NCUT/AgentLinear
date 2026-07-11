@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const MINIMUM_NODE_VERSION = [22, 12, 0];
+const MINIMUM_NODE_VERSION = [22, 16, 0];
 
 function success(id, summary, detail = '') {
   return { id, status: 'ok', summary, detail, action: '' };
@@ -109,7 +109,7 @@ export function runEnvironmentPreflight({
   const checks = [];
   checks.push(versionAtLeast(nodeVersion, MINIMUM_NODE_VERSION)
     ? success('node', `Node.js ${nodeVersion.replace(/^v/, '')}`)
-    : failure('node', `Node.js ${nodeVersion.replace(/^v/, '')} 版本过低`, 'AgentLinear 需要 Node.js 22.12 或更高版本。', '升级 Node.js 后重新启动 AgentLinear。'));
+    : failure('node', `Node.js ${nodeVersion.replace(/^v/, '')} 版本过低`, 'AgentLinear 需要 Node.js 22.16 或更高版本。', '升级 Node.js 后重新启动 AgentLinear。'));
 
   checks.push(checkDirectory('data-directory', dataDirectory, true));
   if (workspacePath) checks.push(checkDirectory('workspace', workspacePath, false));
