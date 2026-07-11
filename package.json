@@ -18,8 +18,8 @@
   "scripts": {
     "start": "electron .",
     "doctor": "node scripts/doctor.mjs",
-    "check": "node --check src/main.js && node --check src/attachment-service.js && node --check src/codex-adapter.js && node --check src/database.js && node --check src/environment.js && node --check src/group-service.js && node --check src/recovery.js && node --check src/scheduler.js && node --check src/task-service.js && node --check src/preload.cjs && node --check scripts/doctor.mjs && node --test tests/*.test.mjs && node tests/verify-demo.mjs",
-    "test": "node --test tests/*.test.mjs && node tests/verify-demo.mjs"
+    "check": "node --check src/main.js && node --check src/attachment-service.js && node --check src/codex-adapter.js && node --check src/database.js && node --check src/environment.js && node --check src/group-service.js && node --check src/recovery.js && node --check src/scheduler.js && node --check src/task-service.js && node --check src/preload.cjs && node --check scripts/doctor.mjs && node --experimental-sqlite --test tests/*.test.mjs && node tests/verify-demo.mjs",
+    "test": "node --experimental-sqlite --test tests/*.test.mjs && node tests/verify-demo.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

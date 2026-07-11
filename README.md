@@ -210,6 +210,8 @@ AgentLinear/
 npm run check
 ```
 
+测试脚本会在 Node.js 22 上显式启用内置 SQLite；Electron 桌面运行时已经包含该能力，不需要用户额外设置启动参数。
+
 贡献方式见 [`CONTRIBUTING.md`](CONTRIBUTING.md)，安全边界见 [`SECURITY.md`](SECURITY.md)。代码以 [MIT License](LICENSE) 开源。
 
 ## 设计原则
