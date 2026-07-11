@@ -682,15 +682,15 @@
       <input id="taskGroupId" type="hidden" value="commerce" />
       <div class="field">
         <label for="taskGroupInput">Session 分组</label>
-        <input id="taskGroupInput" value="Commerce Platform" readonly />
+        <input id="taskGroupInput" readonly />
       </div>
       <div class="field">
         <label for="taskTitleInput">任务标题</label>
-        <input id="taskTitleInput" required maxlength="60" value="检查支付模块的并发安全" />
+        <input id="taskTitleInput" required maxlength="60" placeholder="例如：检查支付模块的并发安全" />
       </div>
       <div class="field">
         <label for="taskPromptInput">第一条指令</label>
-        <textarea id="taskPromptInput" required>请审查 payment 模块的并发写入逻辑，定位可能导致重复扣款的竞态条件，并给出修复。</textarea>
+        <textarea id="taskPromptInput" required placeholder="写清楚目标、范围和你希望看到的结果……"></textarea>
         <div class="field-attachment-row">
           <label class="attach-button" for="taskFileInput">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 12 5.5-5.5a3 3 0 0 1 4.2 4.2L10 18.4a5 5 0 0 1-7.1-7.1l8-8"/></svg>
@@ -703,11 +703,12 @@
       </div>
       <div class="field">
         <label for="taskRepoInput">关联的本地文件夹</label>
-        <input id="taskRepoInput" value="~/Projects/commerce-platform" readonly />
+        <input id="taskRepoInput" readonly />
       </div>
+      <div class="field-error" id="taskFormError"></div>
       <div class="modal-actions">
         <button class="btn" id="cancelNewTask" type="button">取消</button>
-        <button class="btn primary" type="submit">创建并运行</button>
+        <button class="btn primary" id="createTaskButton" type="submit">创建并运行</button>
       </div>
     </form>
   </div>
@@ -788,7 +789,7 @@
     const roadmapItems = [
       { id:'FE-01', priority:'P0', phase:'M0', title:'双视图导航与页面框架', detail:'任务看板与需求排期在同一应用内切换，页面状态互不干扰。', acceptance:'切换视图不会丢失任务、分组或输入数据；刷新后回到上次打开的页面。', status:'done' },
       { id:'FE-02', priority:'P0', phase:'M0', title:'Session 分组与本地文件夹管理', detail:'选择文件夹创建分组，展示 basename，支持重新关联、重命名与移除空分组。', acceptance:'分组名与文件夹名保持一致；重名、目录不存在和非空删除都有明确反馈。', status:'done' },
-      { id:'FE-03', priority:'P0', phase:'M1', title:'任务创建与本地附件', detail:'从指定分组创建任务，输入首轮指令，并选择多个本地文件。', acceptance:'必填校验准确；附件可添加、删除和查看大小；任务始终进入当前分组。', status:'prototype' },
+      { id:'FE-03', priority:'P0', phase:'M1', title:'任务创建与本地附件', detail:'从指定分组创建任务，输入首轮指令，并选择多个本地文件。', acceptance:'必填校验准确；附件可添加、删除和查看大小；任务始终进入当前分组。', status:'done' },
       { id:'FE-04', priority:'P0', phase:'M1', title:'卡片详情与上下文续聊', detail:'在抽屉内查看完整消息、结果和附件，并继续发送后续要求。', acceptance:'每轮消息顺序正确；续聊保留历史上下文；完成任务也能再次提交。', status:'prototype' },
       { id:'FE-05', priority:'P0', phase:'M1', title:'任务生命周期状态机', detail:'统一草稿、排队、运行、完成、失败和取消六种状态及可用操作。', acceptance:'每种状态只出现合法按钮；非法跳转无法触发；状态文案与颜色保持一致。', status:'confirm' },
       { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'prototype' },
@@ -1067,27 +1068,45 @@
 
     function createTask(event) {
       event.preventDefault();
+      const groupId = document.getElementById('taskGroupId').value;
+      const group = groups.find(item => item.id === groupId);
+      const title = document.getElementById('taskTitleInput').value.trim();
+      const prompt = document.getElementById('taskPromptInput').value.trim();
+      const error = document.getElementById('taskFormError');
+      if (!group) {
+        error.textContent = '当前 Session 分组已经失效，请关闭窗口后重新创建。';
+        return;
+      }
+      if (!title) {
+        error.textContent = '请填写任务标题。';
+        document.getElementById('taskTitleInput').focus();
+        return;
+      }
+      if (!prompt) {
+        error.textContent = '请填写第一条指令。';
+        document.getElementById('taskPromptInput').focus();
+        return;
+      }
       const runningCount = tasks.filter(t => t.status === 'running').length;
       const status = runningCount < 6 ? 'running' : 'queued';
-      const maxId = Math.max(...tasks.map(t => Number(t.id.split('-')[1])));
-      const groupId = document.getElementById('taskGroupId').value;
+      const maxId = tasks.reduce((max, task) => Math.max(max, Number(task.id.split('-')[1]) || 0), 1051);
       const task = {
         id:`AGT-${maxId + 1}`,
         status,
         group:groupId,
-        title:document.getElementById('taskTitleInput').value.trim(),
+        title,
         summary: status === 'running' ? '本地会话已创建，正在静默执行第一轮指令。' : '并发槽位已满，任务按创建顺序等待执行。',
-        repo:document.getElementById('taskRepoInput').value.trim() || 'local-workspace',
+        repo:group.path,
         branch:'main',
         time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),
         elapsed: status === 'running' ? '00:01' : '等待 00:01',
         progress: status === 'running' ? 2 : 0,
         turns:1,
-        prompt:document.getElementById('taskPromptInput').value.trim(),
+        prompt,
         attachments:newTaskFiles.map(serializeFile),
         reply:''
       };
-      tasks.splice(6, 0, task);
+      tasks.push(task);
       closeModal();
       render();
       openDrawer(task.id);
@@ -1097,9 +1116,7 @@
     function openModal(groupId = groups[0]?.id) {
       const group = groups.find(item => item.id === groupId) || groups[0];
       if (!group) return;
-      newTaskFiles = [];
-      document.getElementById('taskFileInput').value = '';
-      renderAttachmentTray('taskAttachmentTray', newTaskFiles, 'task');
+      resetTaskForm();
       document.getElementById('taskGroupId').value = group.id;
       document.getElementById('taskGroupInput').value = group.name;
       document.getElementById('taskRepoInput').value = group.path;
@@ -1108,8 +1125,17 @@
     }
     function closeModal() {
       document.getElementById('newTaskModal').classList.remove('open');
+      resetTaskForm();
+    }
+
+    function resetTaskForm() {
+      document.getElementById('newTaskForm').reset();
       newTaskFiles = [];
       document.getElementById('taskFileInput').value = '';
+      document.getElementById('taskGroupId').value = '';
+      document.getElementById('taskGroupInput').value = '';
+      document.getElementById('taskRepoInput').value = '';
+      document.getElementById('taskFormError').textContent = '';
       renderAttachmentTray('taskAttachmentTray', newTaskFiles, 'task');
     }
 
