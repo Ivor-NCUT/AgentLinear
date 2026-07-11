@@ -790,7 +790,7 @@
       { id:'FE-01', priority:'P0', phase:'M0', title:'双视图导航与页面框架', detail:'任务看板与需求排期在同一应用内切换，页面状态互不干扰。', acceptance:'切换视图不会丢失任务、分组或输入数据；刷新后回到上次打开的页面。', status:'done' },
       { id:'FE-02', priority:'P0', phase:'M0', title:'Session 分组与本地文件夹管理', detail:'选择文件夹创建分组，展示 basename，支持重新关联、重命名与移除空分组。', acceptance:'分组名与文件夹名保持一致；重名、目录不存在和非空删除都有明确反馈。', status:'done' },
       { id:'FE-03', priority:'P0', phase:'M1', title:'任务创建与本地附件', detail:'从指定分组创建任务，输入首轮指令，并选择多个本地文件。', acceptance:'必填校验准确；附件可添加、删除和查看大小；任务始终进入当前分组。', status:'done' },
-      { id:'FE-04', priority:'P0', phase:'M1', title:'卡片详情与上下文续聊', detail:'在抽屉内查看完整消息、结果和附件，并继续发送后续要求。', acceptance:'每轮消息顺序正确；续聊保留历史上下文；完成任务也能再次提交。', status:'prototype' },
+      { id:'FE-04', priority:'P0', phase:'M1', title:'卡片详情与上下文续聊', detail:'在抽屉内查看完整消息、结果和附件，并继续发送后续要求。', acceptance:'每轮消息顺序正确；续聊保留历史上下文；完成任务也能再次提交。', status:'done' },
       { id:'FE-05', priority:'P0', phase:'M1', title:'任务生命周期状态机', detail:'统一草稿、排队、运行、完成、失败和取消六种状态及可用操作。', acceptance:'每种状态只出现合法按钮；非法跳转无法触发；状态文案与颜色保持一致。', status:'confirm' },
       { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'prototype' },
       { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'prototype' },
@@ -827,6 +827,7 @@
     let pendingCreateFolder = null;
     let pendingEditFolder = null;
     let removeGroupArmed = false;
+    const conversationScrollPositions = new Map();
 
     function loadGroups() {
       try {
@@ -960,7 +961,8 @@
         </article>`;
     }
 
-    function openDrawer(id) {
+    function openDrawer(id, options = {}) {
+      rememberConversationScroll();
       selectedTaskId = id;
       const task = tasks.find(t => t.id === id);
       if (!task) return;
@@ -975,13 +977,13 @@
       stopButton.style.display = ['running','queued'].includes(task.status) ? 'inline-flex' : 'none';
       stopButton.textContent = task.status === 'queued' ? '取消排队' : '停止任务';
       document.getElementById('continueTask').textContent = task.status === 'draft' ? '运行' : '继续';
-      renderConversation(task);
+      renderConversation(task, options);
       document.getElementById('taskDrawer').classList.add('open');
       document.getElementById('drawerScrim').classList.add('open');
       document.getElementById('taskDrawer').setAttribute('aria-hidden','false');
     }
 
-    function renderConversation(task) {
+    function renderConversation(task, options = {}) {
       const messages = [
         `<div class="message user"><div class="avatar">我</div><div class="bubble"><p>${escapeHtml(task.prompt)}</p>${messageAttachments(task.attachments)}<div class="message-time">${task.time}</div></div></div>`
       ];
@@ -1000,8 +1002,12 @@
       } else if (task.status === 'queued') {
         messages.push(`<div class="execution-placeholder"><strong>正在等待执行槽位</strong>当前排在第 ${task.queueIndex || 1} 位，有任务结束后会自动启动。</div>`);
       }
-      document.getElementById('conversation').innerHTML = messages.join('');
-      document.getElementById('conversation').scrollTop = document.getElementById('conversation').scrollHeight;
+      const conversation = document.getElementById('conversation');
+      conversation.innerHTML = messages.join('');
+      const savedPosition = conversationScrollPositions.get(task.id);
+      requestAnimationFrame(() => {
+        conversation.scrollTop = options.bottom || savedPosition == null ? conversation.scrollHeight : Math.min(savedPosition, conversation.scrollHeight);
+      });
     }
 
     function messageAttachments(attachments = []) {
@@ -1009,13 +1015,20 @@
       return `<div class="message-attachments">${attachments.map(file => `<div class="message-file">${icons.file}<span>${escapeHtml(file.name)}</span><small class="attachment-size">${formatBytes(file.size)}</small></div>`).join('')}</div>`;
     }
 
+    function rememberConversationScroll() {
+      if (!selectedTaskId || !document.getElementById('taskDrawer').classList.contains('open')) return;
+      conversationScrollPositions.set(selectedTaskId, document.getElementById('conversation').scrollTop);
+    }
+
     function closeDrawer() {
+      rememberConversationScroll();
       document.getElementById('taskDrawer').classList.remove('open');
       document.getElementById('drawerScrim').classList.remove('open');
       document.getElementById('taskDrawer').setAttribute('aria-hidden','true');
       document.getElementById('followupInput').value = '';
       followupFiles = [];
       renderAttachmentTray('followupAttachmentTray', followupFiles, 'followup');
+      selectedTaskId = null;
     }
 
     function stopSelectedTask() {
@@ -1028,7 +1041,7 @@
       task.justCompleted = false;
       if (wasRunning) promoteNextTask();
       render();
-      openDrawer(task.id);
+      openDrawer(task.id, { bottom:true });
       toast('任务已停止', wasRunning ? '对应进程已终止，队首任务已自动递补。' : '该任务已从等待队列移除。');
     }
 
@@ -1062,7 +1075,7 @@
       document.getElementById('followupFileInput').value = '';
       renderAttachmentTray('followupAttachmentTray', followupFiles, 'followup');
       render();
-      openDrawer(task.id);
+      openDrawer(task.id, { bottom:true });
       toast('上下文已恢复', task.status === 'running' ? `第 ${task.turns} 轮已开始执行。` : `第 ${task.turns} 轮已进入队列，历史上下文不会丢失。`);
     }
 
@@ -1109,7 +1122,7 @@
       tasks.push(task);
       closeModal();
       render();
-      openDrawer(task.id);
+      openDrawer(task.id, { bottom:true });
       toast(status === 'running' ? '任务已启动' : '任务已加入队列', status === 'running' ? '已创建独立 Codex 会话。' : '当前 6 个执行槽位均被占用。');
     }
 
