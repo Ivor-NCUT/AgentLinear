@@ -218,6 +218,9 @@
 
     .board-wrap { min-height: 0; flex: 1; overflow: auto; padding: 14px 24px 28px; }
 
+    .view-panel { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+    .view-panel.hidden { display: none; }
+
     .board {
       display: grid;
       grid-template-columns: repeat(4, minmax(280px, 1fr));
@@ -331,6 +334,48 @@
     .turn-count { margin-left: auto; color: var(--faint); font-size: 10px; white-space: nowrap; }
 
     .queue-index { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 6px; color: var(--amber); background: var(--amber-soft); font-size: 10px; font-weight: 800; }
+
+    .schedule-view { min-height: 0; flex: 1; overflow: auto; padding: 22px 24px 36px; }
+    .schedule-shell { width: min(1220px, 100%); margin: 0 auto; }
+    .schedule-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: start; margin-bottom: 18px; }
+    .schedule-intro h2 { margin: 0 0 7px; font-size: 19px; letter-spacing: -.025em; }
+    .schedule-intro p { max-width: 680px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .freeze-note { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid #e7d7b6; border-radius: var(--radius-control); color: #8b631d; background: #fff8e9; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .freeze-note svg { width: 14px; height: 14px; }
+
+    .schedule-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 14px; }
+    .schedule-stat { padding: 12px 13px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+    .schedule-stat span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 10px; }
+    .schedule-stat strong { font-size: 20px; letter-spacing: -.03em; }
+    .schedule-stat small { margin-left: 5px; color: var(--faint); font-size: 10px; }
+
+    .phase-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 14px; }
+    .phase-card { position: relative; padding: 12px 13px 12px 17px; border: 1px solid var(--line); border-radius: var(--radius-card); background: rgba(255,255,255,.65); overflow: hidden; }
+    .phase-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--phase-color); }
+    .phase-card strong { display: block; margin-bottom: 4px; font-size: 12px; }
+    .phase-card span { color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .schedule-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
+    .schedule-table { width: 100%; min-width: 1020px; border-collapse: collapse; table-layout: fixed; }
+    .schedule-table th { padding: 10px 12px; border-bottom: 1px solid var(--line-strong); color: var(--muted); background: #f5f6f8; font-size: 10px; font-weight: 750; text-align: left; }
+    .schedule-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 11px; line-height: 1.5; }
+    .schedule-table tbody tr:last-child td { border-bottom: 0; }
+    .schedule-table tbody tr:hover { background: #fafafd; }
+    .order-cell { color: var(--faint); font-family: "SFMono-Regular", Consolas, monospace; font-size: 10px; }
+    .order-cell span, .order-cell a { display: block; }
+    .order-cell a { margin-top: 3px; color: var(--accent); text-decoration: none; }
+    .order-cell a:hover { text-decoration: underline; }
+    .requirement-title { display: block; margin-bottom: 4px; color: var(--ink); font-size: 12px; font-weight: 750; }
+    .requirement-detail, .acceptance-text { color: var(--muted); }
+    .priority-badge, .roadmap-status, .phase-badge { display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 999px; font-size: 9px; font-weight: 750; white-space: nowrap; }
+    .priority-badge.p0 { color: #b33e3e; background: var(--red-soft); }
+    .priority-badge.p1 { color: #8a641d; background: var(--amber-soft); }
+    .phase-badge { color: #5f6571; background: #eef0f3; }
+    .roadmap-status.done { color: var(--green); background: var(--green-soft); }
+    .roadmap-status.prototype { color: #535db8; background: var(--accent-soft); }
+    .roadmap-status.confirm { color: var(--amber); background: var(--amber-soft); }
+    .schedule-footnote { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 11px 12px; border: 1px solid #dfe1f7; border-radius: var(--radius-control); color: #5961a9; background: var(--accent-soft); font-size: 10px; line-height: 1.55; }
+    .schedule-footnote svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
 
     .drawer-scrim { position: fixed; inset: 0; background: rgba(26,28,33,.16); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
     .drawer-scrim.open { opacity: 1; pointer-events: auto; }
@@ -464,6 +509,10 @@
       .board-wrap { padding: 12px 14px 22px; }
       .board { min-width: 0; grid-template-columns: 1fr; }
       .column { min-width: 0; }
+      .schedule-view { padding: 16px 14px 28px; }
+      .schedule-intro { grid-template-columns: 1fr; gap: 10px; }
+      .schedule-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .phase-strip { grid-template-columns: 1fr; }
       .drawer { inset: 0; width: 100%; border: 0; border-radius: 0; }
     }
 
@@ -489,9 +538,13 @@
 
       <nav class="nav-section" aria-label="主导航">
         <div class="nav-label">Workspace</div>
-        <button class="nav-item active" type="button">
+        <button class="nav-item active" id="boardNavButton" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8v8M16 8v8"/></svg>
           <span>任务看板</span><span class="nav-count" id="allCount">14</span>
+        </button>
+        <button class="nav-item" id="scheduleNavButton" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 2v4M16 2v4M4 9h16M8 13h3M8 17h5"/></svg>
+          <span>需求排期</span><span class="nav-count">11</span>
         </button>
       </nav>
 
@@ -506,26 +559,71 @@
     <main class="main">
       <header class="topbar">
         <div class="title-block">
-          <h1>任务看板</h1>
-          <p>本地 Codex 会话 · 自动持久化</p>
+          <h1 id="viewTitle">任务看板</h1>
+          <p id="viewSubtitle">本地 Codex 会话 · 自动持久化</p>
         </div>
         <div class="topbar-center">
           <div class="capacity-pill"><span class="live-dot"></span><span id="capacityPill">6 个 Agent 正在工作 · 4 个等待</span></div>
         </div>
       </header>
 
-      <div class="board-toolbar">
-        <div class="board-context">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h7l2 2h9v10H3z"/><path d="M3 7V5h7l2 2"/></svg>
-          <span>4 个 Session 分组 · 每组关联一个本地文件夹</span>
+      <section class="view-panel" id="boardView">
+        <div class="board-toolbar">
+          <div class="board-context">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h7l2 2h9v10H3z"/><path d="M3 7V5h7l2 2"/></svg>
+            <span>4 个 Session 分组 · 每组关联一个本地文件夹</span>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <span class="toolbar-note">单击卡片查看会话 · 状态变更自动保存</span>
         </div>
-        <div class="toolbar-spacer"></div>
-        <span class="toolbar-note">单击卡片查看会话 · 状态变更自动保存</span>
-      </div>
 
-      <div class="board-wrap">
-        <section class="board" id="sessionBoard" aria-label="Session 分组看板"></section>
-      </div>
+        <div class="board-wrap">
+          <section class="board" id="sessionBoard" aria-label="Session 分组看板"></section>
+        </div>
+      </section>
+
+      <section class="view-panel hidden" id="scheduleView">
+        <div class="schedule-view">
+          <div class="schedule-shell">
+            <div class="schedule-intro">
+              <div>
+                <h2>AgentLinear 前端需求排期</h2>
+                <p>这张表只安排前端演示与产品逻辑确认。每项验收通过后再进入下一项；完整交互冻结后，才开始接 Codex 进程、SQLite 和文件系统后端。</p>
+              </div>
+              <div class="freeze-note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                后端暂时冻结
+              </div>
+            </div>
+
+            <div class="schedule-stats">
+              <div class="schedule-stat"><span>前端需求</span><strong id="roadmapTotal">11</strong><small>项</small></div>
+              <div class="schedule-stat"><span>P0 必须完成</span><strong id="roadmapP0">8</strong><small>项</small></div>
+              <div class="schedule-stat"><span>已有交互原型</span><strong id="roadmapPrototype">6</strong><small>项</small></div>
+              <div class="schedule-stat"><span>等待确认</span><strong id="roadmapConfirm">4</strong><small>项</small></div>
+            </div>
+
+            <div class="phase-strip">
+              <div class="phase-card" style="--phase-color:#5e6ad2"><strong>M0 · 信息架构</strong><span>导航、分组与本地文件夹关系先稳定下来。</span></div>
+              <div class="phase-card" style="--phase-color:#2e8b64"><strong>M1 · 任务闭环</strong><span>从创建、排队、执行到交付和续聊跑通。</span></div>
+              <div class="phase-card" style="--phase-color:#bf6b3b"><strong>M2 · 稳定与验收</strong><span>补齐恢复、异常状态与完整验收脚本。</span></div>
+            </div>
+
+            <div class="schedule-table-wrap">
+              <table class="schedule-table">
+                <colgroup><col style="width:58px"><col style="width:86px"><col style="width:110px"><col style="width:260px"><col style="width:350px"><col style="width:100px"></colgroup>
+                <thead><tr><th>顺序</th><th>优先级</th><th>阶段</th><th>功能需求</th><th>验收口径</th><th>状态</th></tr></thead>
+                <tbody id="roadmapTableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="schedule-footnote">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></svg>
+              <span>确认方式：你可以直接回复“排期确认”，也可以指出要调整的顺序、优先级或验收标准。收到确认前，不开始表内功能开发。</span>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -640,6 +738,20 @@
       { id:'devtools', name:'developer-tools', path:'~/Projects/developer-tools', color:'#7a5bb6', repos:['release-cli','catalog-search','open-sdk','api-gateway'] }
     ];
 
+    const roadmapItems = [
+      { id:'FE-01', priority:'P0', phase:'M0', title:'双视图导航与页面框架', detail:'任务看板与需求排期在同一应用内切换，页面状态互不干扰。', acceptance:'切换视图不会丢失任务、分组或输入数据；刷新后回到上次打开的页面。', status:'done' },
+      { id:'FE-02', priority:'P0', phase:'M0', title:'Session 分组与本地文件夹管理', detail:'选择文件夹创建分组，展示 basename，支持重新关联、重命名与移除空分组。', acceptance:'分组名与文件夹名保持一致；重名、目录不存在和非空删除都有明确反馈。', status:'prototype' },
+      { id:'FE-03', priority:'P0', phase:'M1', title:'任务创建与本地附件', detail:'从指定分组创建任务，输入首轮指令，并选择多个本地文件。', acceptance:'必填校验准确；附件可添加、删除和查看大小；任务始终进入当前分组。', status:'prototype' },
+      { id:'FE-04', priority:'P0', phase:'M1', title:'卡片详情与上下文续聊', detail:'在抽屉内查看完整消息、结果和附件，并继续发送后续要求。', acceptance:'每轮消息顺序正确；续聊保留历史上下文；完成任务也能再次提交。', status:'prototype' },
+      { id:'FE-05', priority:'P0', phase:'M1', title:'任务生命周期状态机', detail:'统一草稿、排队、运行、完成、失败和取消六种状态及可用操作。', acceptance:'每种状态只出现合法按钮；非法跳转无法触发；状态文案与颜色保持一致。', status:'confirm' },
+      { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'prototype' },
+      { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'prototype' },
+      { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'confirm' },
+      { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'prototype' },
+      { id:'FE-10', priority:'P1', phase:'M2', title:'异常、空白与危险操作反馈', detail:'覆盖无分组、无任务、文件失效、启动失败、队列异常和删除确认。', acceptance:'每个异常都有下一步操作；危险动作二次确认；页面不会停在无法理解的状态。', status:'confirm' },
+      { id:'FE-11', priority:'P1', phase:'M2', title:'完整演示脚本与产品逻辑冻结', detail:'固化从建组、提交 10 个任务、续聊、停止、恢复到查看交付的验收流程。', acceptance:'按脚本完整走一遍无断点；你确认交互后输出前端逻辑说明，再开始后端设计。', status:'confirm' }
+    ];
+
     let groups = loadGroups();
 
     const initialTasks = [
@@ -663,6 +775,7 @@
     let selectedTaskId = null;
     let newTaskFiles = [];
     let followupFiles = [];
+    let currentView = localStorage.getItem('agent-linear-current-view') === 'schedule' ? 'schedule' : 'board';
 
     function loadGroups() {
       try {
@@ -693,6 +806,42 @@
       return { draft:'草稿', running:'运行中', queued:'排队中', done:'已完成', canceled:'已取消' }[status];
     }
 
+    function renderRoadmap() {
+      const statusMeta = {
+        done:{ label:'已完成', className:'done' },
+        prototype:{ label:'已有原型', className:'prototype' },
+        confirm:{ label:'待确认', className:'confirm' }
+      };
+      document.getElementById('roadmapTableBody').innerHTML = roadmapItems.map((item, index) => {
+        const status = statusMeta[item.status];
+        return `<tr>
+          <td class="order-cell"><span>${String(index + 1).padStart(2, '0')}</span><a href="https://github.com/Ivor-NCUT/AgentLinear/issues/${index + 1}" target="_blank" rel="noreferrer">#${index + 1}</a></td>
+          <td><span class="priority-badge ${item.priority.toLowerCase()}">${item.priority}</span></td>
+          <td><span class="phase-badge">${item.phase}</span></td>
+          <td><span class="requirement-title">${escapeHtml(item.title)}</span><span class="requirement-detail">${escapeHtml(item.detail)}</span></td>
+          <td><span class="acceptance-text">${escapeHtml(item.acceptance)}</span></td>
+          <td><span class="roadmap-status ${status.className}">${status.label}</span></td>
+        </tr>`;
+      }).join('');
+      document.getElementById('roadmapTotal').textContent = roadmapItems.length;
+      document.getElementById('roadmapP0').textContent = roadmapItems.filter(item => item.priority === 'P0').length;
+      document.getElementById('roadmapPrototype').textContent = roadmapItems.filter(item => item.status === 'prototype').length;
+      document.getElementById('roadmapConfirm').textContent = roadmapItems.filter(item => item.status === 'confirm').length;
+    }
+
+    function switchView(view) {
+      currentView = view === 'schedule' ? 'schedule' : 'board';
+      const showingSchedule = currentView === 'schedule';
+      document.getElementById('boardView').classList.toggle('hidden', showingSchedule);
+      document.getElementById('scheduleView').classList.toggle('hidden', !showingSchedule);
+      document.getElementById('boardNavButton').classList.toggle('active', !showingSchedule);
+      document.getElementById('scheduleNavButton').classList.toggle('active', showingSchedule);
+      document.getElementById('viewTitle').textContent = showingSchedule ? '需求排期' : '任务看板';
+      document.getElementById('viewSubtitle').textContent = showingSchedule ? 'AgentLinear 前端开发计划 · 等待确认' : '本地 Codex 会话 · 自动持久化';
+      document.getElementById('capacityPill').textContent = showingSchedule ? '前端排期确认中 · 后端冻结' : `${tasks.filter(task => task.status === 'running').length} 个 Agent 正在工作 · ${tasks.filter(task => task.status === 'queued').length} 个等待`;
+      localStorage.setItem('agent-linear-current-view', currentView);
+    }
+
     function render() {
       const queuedTasks = tasks.filter(task => task.status === 'queued');
       queuedTasks.forEach((task, index) => task.queueIndex = index + 1);
@@ -704,7 +853,7 @@
       document.getElementById('allCount').textContent = tasks.length;
       document.getElementById('capacityText').textContent = `${running} / 6`;
       document.getElementById('capacityBar').style.width = `${running / 6 * 100}%`;
-      document.getElementById('capacityPill').textContent = `${running} 个 Agent 正在工作 · ${queued} 个等待`;
+      if (currentView === 'board') document.getElementById('capacityPill').textContent = `${running} 个 Agent 正在工作 · ${queued} 个等待`;
 
       document.querySelectorAll('.task-card').forEach(card => card.addEventListener('click', () => openDrawer(card.dataset.id)));
       document.querySelectorAll('[data-add-group]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.addGroup)));
@@ -999,6 +1148,8 @@
     }
 
     document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
+    document.getElementById('boardNavButton').addEventListener('click', () => switchView('board'));
+    document.getElementById('scheduleNavButton').addEventListener('click', () => switchView('schedule'));
     document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
     document.getElementById('stopTask').addEventListener('click', stopSelectedTask);
     document.getElementById('continueTask').addEventListener('click', continueSelectedTask);
@@ -1020,7 +1171,9 @@
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); closeModal(); closeEditGroup(); } });
     document.getElementById('followupInput').addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') continueSelectedTask(); });
 
+    renderRoadmap();
     render();
+    switchView(currentView);
   </script>
 </body>
 </html>
