@@ -782,6 +782,8 @@
       file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/></svg>'
     };
 
+    const MAX_CONCURRENT_TASKS = 6;
+
     const initialGroups = [
       { id:'acme', name:'acme-console', path:'~/Projects/acme-console', color:'#5e6ad2', repos:['acme-console','web-app','core-service'] },
       { id:'commerce', name:'commerce-platform', path:'~/Projects/commerce-platform', color:'#2e8b64', repos:['ops-backend','billing-api','crm-service','mobile-api'] },
@@ -795,7 +797,7 @@
       { id:'FE-03', priority:'P0', phase:'M1', title:'任务创建与本地附件', detail:'从指定分组创建任务，输入首轮指令，并选择多个本地文件。', acceptance:'必填校验准确；附件可添加、删除和查看大小；任务始终进入当前分组。', status:'done' },
       { id:'FE-04', priority:'P0', phase:'M1', title:'卡片详情与上下文续聊', detail:'在抽屉内查看完整消息、结果和附件，并继续发送后续要求。', acceptance:'每轮消息顺序正确；续聊保留历史上下文；完成任务也能再次提交。', status:'done' },
       { id:'FE-05', priority:'P0', phase:'M1', title:'任务生命周期状态机', detail:'统一草稿、排队、运行、完成、失败和取消六种状态及可用操作。', acceptance:'每种状态只出现合法按钮；非法跳转无法触发；状态文案与颜色保持一致。', status:'done' },
-      { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'prototype' },
+      { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'done' },
       { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'prototype' },
       { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'confirm' },
       { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'prototype' },
@@ -841,6 +843,7 @@
     ];
 
     let tasks = loadTasks();
+    let queueSequence = tasks.reduce((max, task) => Math.max(max, task.queueOrder || 0), 0);
     let selectedTaskId = null;
     let newTaskFiles = [];
     let followupFiles = [];
@@ -865,9 +868,23 @@
       try {
         const saved = localStorage.getItem('agent-linear-demo-v2');
         const loaded = saved ? JSON.parse(saved) : structuredClone(initialTasks);
-        return loaded.map(task => ({ ...task, group: task.group || inferGroup(task.repo) }));
-      } catch { return structuredClone(initialTasks).map(task => ({ ...task, group: inferGroup(task.repo) })); }
+        return normalizeQueueOrders(loaded.map(task => ({ ...task, group: task.group || inferGroup(task.repo) })));
+      } catch { return normalizeQueueOrders(structuredClone(initialTasks).map(task => ({ ...task, group: inferGroup(task.repo) }))); }
     }
+
+    function normalizeQueueOrders(items) {
+      let maxOrder = items.reduce((max, task) => Math.max(max, Number(task.queueOrder) || 0), 0);
+      const usedOrders = new Set();
+      return items.map(task => {
+        if (task.status !== 'queued') return task;
+        let queueOrder = Number(task.queueOrder);
+        if (!queueOrder || usedOrders.has(queueOrder)) queueOrder = ++maxOrder;
+        usedOrders.add(queueOrder);
+        return { ...task, queueOrder };
+      });
+    }
+
+    function nextQueueOrder() { return ++queueSequence; }
 
     function saveTasks() { localStorage.setItem('agent-linear-demo-v2', JSON.stringify(tasks)); }
 
@@ -882,16 +899,18 @@
     function transitionTask(task, nextStatus, changes = {}) {
       if (!task || !taskTransitions[task.status]?.includes(nextStatus)) return false;
       task.status = nextStatus;
+      if (nextStatus !== 'queued') delete task.queueOrder;
       Object.assign(task, changes);
       return true;
     }
 
     function scheduleTask(task) {
       if (!task) return false;
-      const nextStatus = tasks.filter(item => item.status === 'running').length < 6 ? 'running' : 'queued';
+      const nextStatus = tasks.filter(item => item.status === 'running').length < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
       return transitionTask(task, nextStatus, {
         elapsed:nextStatus === 'running' ? '00:01' : '等待 00:01',
         progress:nextStatus === 'running' ? 3 : 0,
+        ...(nextStatus === 'queued' ? { queueOrder:nextQueueOrder() } : {}),
         justCompleted:false
       });
     }
@@ -933,7 +952,7 @@
     }
 
     function render() {
-      const queuedTasks = tasks.filter(task => task.status === 'queued');
+      const queuedTasks = tasks.filter(task => task.status === 'queued').sort((a, b) => a.queueOrder - b.queueOrder);
       queuedTasks.forEach((task, index) => task.queueIndex = index + 1);
 
       const board = document.getElementById('sessionBoard');
@@ -945,8 +964,8 @@
       const running = tasks.filter(task => task.status === 'running').length;
       const queued = queuedTasks.length;
       document.getElementById('allCount').textContent = tasks.length;
-      document.getElementById('capacityText').textContent = `${running} / 6`;
-      document.getElementById('capacityBar').style.width = `${running / 6 * 100}%`;
+      document.getElementById('capacityText').textContent = `${running} / ${MAX_CONCURRENT_TASKS}`;
+      document.getElementById('capacityBar').style.width = `${running / MAX_CONCURRENT_TASKS * 100}%`;
       if (currentView === 'board') document.getElementById('capacityPill').textContent = `${running} 个 Agent 正在工作 · ${queued} 个等待`;
 
       document.querySelectorAll('.task-card').forEach(card => card.addEventListener('click', () => openDrawer(card.dataset.id)));
@@ -1090,7 +1109,7 @@
     }
 
     function promoteNextTask() {
-      const next = tasks.find(t => t.status === 'queued');
+      const next = tasks.filter(task => task.status === 'queued').sort((a, b) => a.queueOrder - b.queueOrder)[0];
       if (!next) return;
       transitionTask(next, 'running', { elapsed:'00:01', progress:4, summary:'已获得执行槽位，正在启动本地 Codex 会话。' });
       toast('队列自动递补', `${next.id}「${next.title}」已开始执行。`);
@@ -1146,7 +1165,7 @@
         return;
       }
       const runningCount = tasks.filter(t => t.status === 'running').length;
-      const status = runningCount < 6 ? 'running' : 'queued';
+      const status = runningCount < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
       const maxId = tasks.reduce((max, task) => Math.max(max, Number(task.id.split('-')[1]) || 0), 1051);
       const task = {
         id:`AGT-${maxId + 1}`,
@@ -1159,6 +1178,7 @@
         time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),
         elapsed: status === 'running' ? '00:01' : '等待 00:01',
         progress: status === 'running' ? 2 : 0,
+        ...(status === 'queued' ? { queueOrder:nextQueueOrder() } : {}),
         turns:1,
         prompt,
         attachments:newTaskFiles.map(serializeFile),
