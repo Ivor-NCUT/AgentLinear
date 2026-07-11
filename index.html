@@ -320,6 +320,7 @@
     .status-chip.done { color: var(--green); background: var(--green-soft); }
     .status-chip.canceled { color: var(--red); background: var(--red-soft); }
     .status-chip.failed { color: var(--red); background: var(--red-soft); }
+    .status-chip.recovering { color: var(--amber); background: var(--amber-soft); }
     .chip-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
     .card-time { margin-left: auto; color: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; }
 
@@ -786,6 +787,7 @@
     };
 
     const MAX_CONCURRENT_TASKS = 6;
+    const APP_DATA_VERSION = 3;
 
     const initialGroups = [
       { id:'acme', name:'acme-console', path:'~/Projects/acme-console', color:'#5e6ad2', repos:['acme-console','web-app','core-service'] },
@@ -803,7 +805,7 @@
       { id:'FE-06', priority:'P0', phase:'M1', title:'6 并发与 FIFO 排队演示', detail:'全局固定 6 个运行槽位，超出部分按提交顺序进入等待队列。', acceptance:'连续提交 10 个任务时仅 6 个运行；4 个队列序号连续且不会重复。', status:'done' },
       { id:'FE-07', priority:'P0', phase:'M1', title:'停止、取消与队首递补', detail:'运行任务可强制停止，排队任务可取消；释放槽位后自动启动队首。', acceptance:'停止后运行数不超过 6；被取消任务不再启动；递补顺序符合 FIFO。', status:'done' },
       { id:'FE-08', priority:'P1', phase:'M1', title:'完成交付与用户提醒', detail:'任务完成后高亮卡片，展示最终结果，并提供可关闭的声音提醒。', acceptance:'提醒只触发一次；静音设置有效；打开卡片后高亮状态自动消除。', status:'done' },
-      { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'prototype' },
+      { id:'FE-09', priority:'P0', phase:'M2', title:'本地留存与重启恢复演示', detail:'持久化分组、任务、消息、附件元信息、队列顺序和最后打开页面。', acceptance:'关闭页面再打开后数据完整；运行中任务显示清晰的“等待恢复”状态。', status:'done' },
       { id:'FE-10', priority:'P1', phase:'M2', title:'异常、空白与危险操作反馈', detail:'覆盖无分组、无任务、文件失效、启动失败、队列异常和删除确认。', acceptance:'每个异常都有下一步操作；危险动作二次确认；页面不会停在无法理解的状态。', status:'confirm' },
       { id:'FE-11', priority:'P1', phase:'M2', title:'完整演示脚本与产品逻辑冻结', detail:'固化从建组、提交 10 个任务、续聊、停止、恢复到查看交付的验收流程。', acceptance:'按脚本完整走一遍无断点；你确认交互后输出前端逻辑说明，再开始后端设计。', status:'confirm' }
     ];
@@ -820,7 +822,7 @@
     const taskTransitions = {
       draft:['running','queued','canceled'],
       queued:['running','canceled'],
-      running:['done','failed','canceled'],
+      running:['done','failed','canceled','queued'],
       done:['running','queued'],
       failed:['running','queued','canceled'],
       canceled:['running','queued']
@@ -845,6 +847,7 @@
       { id:'AGT-1032', status:'canceled', title:'重写整个日志系统', summary:'用户主动停止：方案偏离当前最小改动范围。', repo:'core-service', branch:'experiment/logger', time:'10:42', elapsed:'已取消', progress:33, turns:2, prompt:'帮我整理日志模块。', reply:'我准备引入新的事件总线并替换现有日志接口。' }
     ];
 
+    let restoredFromStorage = false;
     let tasks = loadTasks();
     let queueSequence = tasks.reduce((max, task) => Math.max(max, task.queueOrder || 0), 0);
     let selectedTaskId = null;
@@ -870,10 +873,18 @@
 
     function loadTasks() {
       try {
-        const saved = localStorage.getItem('agent-linear-demo-v2');
-        const loaded = saved ? JSON.parse(saved) : structuredClone(initialTasks);
-        return normalizeQueueOrders(loaded.map(task => ({ ...task, group: task.group || inferGroup(task.repo) })));
-      } catch { return normalizeQueueOrders(structuredClone(initialTasks).map(task => ({ ...task, group: inferGroup(task.repo) }))); }
+        const state = JSON.parse(localStorage.getItem('agent-linear-state-v3') || 'null');
+        const legacy = localStorage.getItem('agent-linear-demo-v2');
+        const savedTasks = state?.version === APP_DATA_VERSION && Array.isArray(state.tasks) ? state.tasks : legacy ? JSON.parse(legacy) : null;
+        restoredFromStorage = Boolean(savedTasks);
+        const loaded = savedTasks || structuredClone(initialTasks);
+        const normalized = loaded.map(task => ({ ...task, group:task.group || inferGroup(task.repo) }));
+        const recovered = restoredFromStorage ? normalized.map(task => task.status === 'running' ? { ...task, recoveryPending:true, elapsed:'等待恢复', summary:'应用重新打开，等待用户恢复本地 Session。' } : task) : normalized;
+        return normalizeQueueOrders(recovered);
+      } catch {
+        restoredFromStorage = false;
+        return normalizeQueueOrders(structuredClone(initialTasks).map(task => ({ ...task, group: inferGroup(task.repo) })));
+      }
     }
 
     function normalizeQueueOrders(items) {
@@ -890,7 +901,9 @@
 
     function nextQueueOrder() { return ++queueSequence; }
 
-    function saveTasks() { localStorage.setItem('agent-linear-demo-v2', JSON.stringify(tasks)); }
+    function saveTasks() { localStorage.setItem('agent-linear-state-v3', JSON.stringify({ version:APP_DATA_VERSION, tasks })); }
+
+    function activeRunningCount() { return tasks.filter(task => task.status === 'running' && !task.recoveryPending).length; }
 
     function inferGroup(repo) {
       return groups.find(group => group.repos.includes(repo))?.id || groups[0].id;
@@ -910,7 +923,7 @@
 
     function scheduleTask(task) {
       if (!task) return false;
-      const nextStatus = tasks.filter(item => item.status === 'running').length < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
+      const nextStatus = activeRunningCount() < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
       return transitionTask(task, nextStatus, {
         elapsed:nextStatus === 'running' ? '00:01' : '等待 00:01',
         progress:nextStatus === 'running' ? 3 : 0,
@@ -951,7 +964,7 @@
       document.getElementById('scheduleNavButton').classList.toggle('active', showingSchedule);
       document.getElementById('viewTitle').textContent = showingSchedule ? '需求排期' : '任务看板';
       document.getElementById('viewSubtitle').textContent = showingSchedule ? 'AgentLinear 前端开发计划 · 等待确认' : '本地 Codex 会话 · 自动持久化';
-      document.getElementById('capacityPill').textContent = showingSchedule ? '前端排期确认中 · 后端冻结' : `${tasks.filter(task => task.status === 'running').length} 个 Agent 正在工作 · ${tasks.filter(task => task.status === 'queued').length} 个等待`;
+      document.getElementById('capacityPill').textContent = showingSchedule ? '前端排期确认中 · 后端冻结' : `${activeRunningCount()} 个 Agent 正在工作 · ${tasks.filter(task => task.status === 'queued').length} 个等待`;
       localStorage.setItem('agent-linear-current-view', currentView);
     }
 
@@ -965,7 +978,7 @@
       board.style.minWidth = groups.length > 1 ? `${groups.length * 294}px` : '0';
       document.getElementById('groupSummary').textContent = `${groups.length} 个 Session 分组 · 每组关联一个本地文件夹`;
 
-      const running = tasks.filter(task => task.status === 'running').length;
+      const running = activeRunningCount();
       const queued = queuedTasks.length;
       document.getElementById('allCount').textContent = tasks.length;
       document.getElementById('capacityText').textContent = `${running} / ${MAX_CONCURRENT_TASKS}`;
@@ -983,9 +996,10 @@
 
     function groupTemplate(group) {
       const items = tasks.filter(task => task.group === group.id);
-      const running = items.filter(task => task.status === 'running').length;
+      const running = items.filter(task => task.status === 'running' && !task.recoveryPending).length;
+      const recovering = items.filter(task => task.recoveryPending).length;
       const queued = items.filter(task => task.status === 'queued').length;
-      const statusSummary = [running ? `${running} 运行` : '', queued ? `${queued} 等待` : ''].filter(Boolean).join(' · ') || '暂无执行';
+      const statusSummary = [running ? `${running} 运行` : '', recovering ? `${recovering} 待恢复` : '', queued ? `${queued} 等待` : ''].filter(Boolean).join(' · ') || '暂无执行';
       return `
         <div class="column" data-group="${group.id}" style="--group-color:${group.color}">
           <div class="column-head">
@@ -1007,17 +1021,19 @@
 
     function cardTemplate(task) {
       const isQueued = task.status === 'queued';
+      const displayClass = task.recoveryPending ? 'recovering' : task.status;
+      const displayLabel = task.recoveryPending ? '等待恢复' : statusLabel(task.status);
       return `
         <article class="task-card ${task.status} ${task.justCompleted ? 'just-completed' : ''}" data-id="${task.id}" tabindex="0">
-          ${task.status === 'running' ? '<span class="running-bar"></span>' : ''}
+          ${task.status === 'running' && !task.recoveryPending ? '<span class="running-bar"></span>' : ''}
           <div class="card-top">
             ${isQueued ? `<span class="queue-index">${task.queueIndex}</span>` : `<span class="card-id">${task.id}</span>`}
-            <span class="status-chip ${task.status}"><span class="chip-dot"></span>${statusLabel(task.status)}</span>
+            <span class="status-chip ${displayClass}"><span class="chip-dot"></span>${displayLabel}</span>
             <span class="card-time">${task.elapsed}</span>
           </div>
           <h3>${escapeHtml(task.title)}</h3>
           <p>${escapeHtml(task.summary)}</p>
-          ${(task.status === 'running' || task.status === 'queued') ? `<div class="card-progress"><span style="width:${task.progress}%"></span></div>` : ''}
+          ${((task.status === 'running' && !task.recoveryPending) || task.status === 'queued') ? `<div class="card-progress"><span style="width:${task.progress}%"></span></div>` : ''}
           <div class="card-footer">
             <span class="repo-badge">${icons.repo}<span>${escapeHtml(task.repo)}</span></span>
             <span class="turn-count">${task.turns} 轮对话</span>
@@ -1039,16 +1055,17 @@
       document.getElementById('drawerId').textContent = task.id;
       document.getElementById('drawerTitle').textContent = task.title;
       const status = document.getElementById('drawerStatus');
-      status.className = `status-chip ${task.status}`;
-      status.innerHTML = `<span class="chip-dot"></span>${statusLabel(task.status)}`;
+      status.className = `status-chip ${task.recoveryPending ? 'recovering' : task.status}`;
+      status.innerHTML = `<span class="chip-dot"></span>${task.recoveryPending ? '等待恢复' : statusLabel(task.status)}`;
       document.getElementById('drawerMeta').innerHTML = `<span>${icons.repo}${escapeHtml(task.repo)}</span><span>${icons.branch}${escapeHtml(task.branch)}</span><span>${icons.clock}${escapeHtml(task.elapsed)}</span>`;
       document.getElementById('contextNote').textContent = `已载入 ${task.turns} 轮上下文`;
       const actions = taskStates[task.status]?.actions || [];
-      document.getElementById('completeTask').style.display = task.status === 'running' ? 'inline-flex' : 'none';
+      document.getElementById('completeTask').style.display = task.status === 'running' && !task.recoveryPending ? 'inline-flex' : 'none';
       const stopButton = document.getElementById('stopTask');
       stopButton.style.display = actions.includes('stop') || actions.includes('cancel') ? 'inline-flex' : 'none';
       stopButton.textContent = task.status === 'queued' ? '取消排队' : task.status === 'running' ? '停止任务' : '取消任务';
-      document.getElementById('retryTask').style.display = actions.includes('retry') ? 'inline-flex' : 'none';
+      document.getElementById('retryTask').style.display = actions.includes('retry') || task.recoveryPending ? 'inline-flex' : 'none';
+      document.getElementById('retryTask').textContent = task.recoveryPending ? '恢复任务' : '重试任务';
       document.getElementById('continueTask').textContent = task.status === 'draft' ? '运行' : '继续';
       renderConversation(task, options);
       document.getElementById('taskDrawer').classList.add('open');
@@ -1073,7 +1090,9 @@
       if (task.finalResult) {
         messages.push(`<div class="message agent"><div class="avatar">AL</div><div class="bubble"><p>${escapeHtml(task.finalResult)}</p><div class="message-time">Agent Linear · 最终交付</div></div></div>`);
       }
-      if (task.status === 'running') {
+      if (task.recoveryPending) {
+        messages.push('<div class="execution-placeholder"><strong>Session 等待恢复</strong>应用已重新打开。确认恢复后，任务会重新占用执行槽位。</div>');
+      } else if (task.status === 'running') {
         messages.push('<div class="execution-placeholder"><div class="quiet-bars"><i></i><i></i><i></i></div><strong>Agent 正在静默执行</strong>本轮完成后，将一次性展示最终结果。</div>');
       } else if (task.status === 'queued') {
         messages.push(`<div class="execution-placeholder"><strong>正在等待执行槽位</strong>当前排在第 ${task.queueIndex || 1} 位，有任务结束后会自动启动。</div>`);
@@ -1180,7 +1199,7 @@
     }
 
     function promoteNextTask() {
-      if (tasks.filter(task => task.status === 'running').length >= MAX_CONCURRENT_TASKS) return false;
+      if (activeRunningCount() >= MAX_CONCURRENT_TASKS) return false;
       const next = tasks.filter(task => task.status === 'queued').sort((a, b) => a.queueOrder - b.queueOrder)[0];
       if (!next) return false;
       transitionTask(next, 'running', { elapsed:'00:01', progress:4, summary:'已获得执行槽位，正在启动本地 Codex 会话。' });
@@ -1190,11 +1209,27 @@
 
     function retrySelectedTask() {
       const task = tasks.find(item => item.id === selectedTaskId);
-      if (!task || task.status !== 'failed' || !scheduleTask(task)) return;
+      if (!task) return;
+      const wasRecovering = task.recoveryPending;
+      if (wasRecovering) {
+        if (!resumeRecoveredTask(task)) return;
+      } else if (task.status !== 'failed' || !scheduleTask(task)) return;
       task.summary = task.status === 'running' ? '正在重新执行上一轮指令。' : '重试任务已进入等待队列。';
       render();
       openDrawer(task.id, { bottom:true });
-      toast('任务已重试', task.status === 'running' ? '已获得执行槽位。' : '当前并发已满，任务进入队列。');
+      toast(wasRecovering ? 'Session 已恢复' : '任务已重试', task.status === 'running' ? '已获得执行槽位。' : '当前并发已满，任务进入队列。');
+    }
+
+    function resumeRecoveredTask(task) {
+      if (!task?.recoveryPending) return false;
+      if (activeRunningCount() < MAX_CONCURRENT_TASKS) {
+        task.recoveryPending = false;
+        task.elapsed = '00:01';
+        task.progress = Math.max(task.progress || 0, 3);
+        return true;
+      }
+      task.recoveryPending = false;
+      return transitionTask(task, 'queued', { elapsed:'等待 00:01', progress:0, queueOrder:nextQueueOrder() });
     }
 
     function continueSelectedTask() {
@@ -1206,7 +1241,8 @@
       task.followups.push({ text:message, attachments:followupFiles.map(serializeFile) });
       task.turns += 1;
       task.justCompleted = false;
-      if (!['running','queued'].includes(task.status)) scheduleTask(task);
+      if (task.recoveryPending) resumeRecoveredTask(task);
+      else if (!['running','queued'].includes(task.status)) scheduleTask(task);
       input.value = '';
       followupFiles = [];
       document.getElementById('followupFileInput').value = '';
@@ -1237,7 +1273,7 @@
         document.getElementById('taskPromptInput').focus();
         return;
       }
-      const runningCount = tasks.filter(t => t.status === 'running').length;
+      const runningCount = activeRunningCount();
       const status = runningCount < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
       const maxId = tasks.reduce((max, task) => Math.max(max, Number(task.id.split('-')[1]) || 0), 1051);
       const task = {
