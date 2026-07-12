@@ -10,7 +10,7 @@ import path from 'node:path';
 import { DatabaseSync, backup } from 'node:sqlite';
 
 export const DATABASE_FILENAME = 'agentlinear.sqlite3';
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 
 const migrations = [
   {
@@ -117,6 +117,14 @@ const migrations = [
         value_json TEXT NOT NULL,
         updated_at TEXT NOT NULL
       ) STRICT;
+    `
+  },
+  {
+    version: 2,
+    name: 'task_kinds',
+    sql: `
+      ALTER TABLE tasks ADD COLUMN task_kind TEXT NOT NULL DEFAULT 'codex'
+        CHECK (task_kind IN ('todo', 'codex'));
     `
   }
 ];

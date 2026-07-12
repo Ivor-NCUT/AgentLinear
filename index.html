@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light" />
+  <meta name="color-scheme" content="light dark" />
   <title>Agent Linear · 多线程 AI 协作看板</title>
   <style>
     :root {
@@ -497,6 +497,14 @@
     .path-preview svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--accent); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .modal-actions .push-left { margin-right: auto; }
+    .is-hidden { display: none !important; }
+    .task-kind-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .task-kind-option { position: relative; display: block; cursor: pointer; }
+    .task-kind-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .task-kind-option span { display: block; min-height: 62px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface-soft); font-size: 11px; line-height: 1.45; }
+    .task-kind-option strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 12px; }
+    .task-kind-option input:checked + span { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 13%, transparent); }
+    .task-kind-option input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
     .field-error { min-height: 15px; color: var(--red); font-size: 10px; line-height: 1.45; }
     .folder-picker { display: grid; place-items: center; gap: 7px; padding: 18px 14px; border: 1px dashed #c8cbd2; border-radius: var(--radius-card); color: var(--muted); background: var(--surface-soft); text-align: center; }
     .folder-picker svg { width: 24px; height: 24px; color: var(--accent); }
@@ -553,6 +561,78 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
     }
+
+    .theme-toggle { width: 34px; padding: 0; font-size: 16px; }
+    .theme-toggle .theme-icon-light { display: none; }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #111318;
+      --surface: #1b1e25;
+      --surface-soft: #22262f;
+      --ink: #f0f1f3;
+      --muted: #a4a9b3;
+      --faint: #737986;
+      --line: #2b303a;
+      --line-strong: #383e49;
+      --accent: #8791f4;
+      --accent-soft: #292d4b;
+      --green: #67c99a;
+      --green-soft: #19372b;
+      --amber: #e2ad56;
+      --amber-soft: #3a2e19;
+      --red: #ef8585;
+      --red-soft: #3b2226;
+      --shadow-panel: 0 24px 70px rgba(0,0,0,.48), 0 2px 8px rgba(0,0,0,.3);
+      --shadow-card: 0 1px 2px rgba(0,0,0,.28);
+    }
+
+    html[data-theme="dark"] .theme-icon-dark { display: none; }
+    html[data-theme="dark"] .theme-icon-light { display: inline; }
+    html[data-theme="dark"] .sidebar { background: #171a20; }
+    html[data-theme="dark"] .workspace-switcher,
+    html[data-theme="dark"] .resource-meter,
+    html[data-theme="dark"] .column-head,
+    html[data-theme="dark"] .phase-card,
+    html[data-theme="dark"] .board-empty { background: rgba(34,38,47,.72); }
+    html[data-theme="dark"] .workspace-avatar,
+    html[data-theme="dark"] .avatar { background: #343946; color: var(--ink); }
+    html[data-theme="dark"] .nav-item { color: var(--muted); }
+    html[data-theme="dark"] .nav-item:hover { background: rgba(255,255,255,.055); }
+    html[data-theme="dark"] .nav-item.active { background: #242832; }
+    html[data-theme="dark"] .meter,
+    html[data-theme="dark"] .column-count,
+    html[data-theme="dark"] .card-progress { background: #343945; }
+    html[data-theme="dark"] .topbar { background: rgba(27,30,37,.88); }
+    html[data-theme="dark"] .capacity-pill { color: #b7bdff; border-color: #3b416b; }
+    html[data-theme="dark"] .environment-pill.ready { border-color: #315d49; }
+    html[data-theme="dark"] .environment-pill.error,
+    html[data-theme="dark"] .btn.danger,
+    html[data-theme="dark"] .message-file.missing { border-color: #63363d; }
+    html[data-theme="dark"] .btn:hover,
+    html[data-theme="dark"] .group-menu:hover { background: #292d36; border-color: #4a515e; }
+    html[data-theme="dark"] .btn.primary:hover { background: #7580e8; }
+    html[data-theme="dark"] .task-card:hover { border-color: #4a515e; box-shadow: 0 7px 20px rgba(0,0,0,.24); }
+    html[data-theme="dark"] .task-card.running { background: #20232c; }
+    html[data-theme="dark"] .task-card.queued,
+    html[data-theme="dark"] .task-card.interrupted { background: #262319; }
+    html[data-theme="dark"] .task-card.failed { background: #292024; }
+    html[data-theme="dark"] .freeze-note { color: #e5b96b; border-color: #5d4928; background: #302817; }
+    html[data-theme="dark"] .schedule-table th { background: #22262f; }
+    html[data-theme="dark"] .schedule-table tbody tr:hover { background: #20242c; }
+    html[data-theme="dark"] .phase-badge { color: #b8bdc7; background: #303540; }
+    html[data-theme="dark"] .schedule-footnote { color: #b7bdff; border-color: #3b416b; }
+    html[data-theme="dark"] .drawer-scrim,
+    html[data-theme="dark"] .modal-scrim { background: rgba(0,0,0,.58); }
+    html[data-theme="dark"] .conversation { background: #15181e; }
+    html[data-theme="dark"] .message.user .bubble { border-color: #4b5262; background: #3b4050; }
+    html[data-theme="dark"] .bubble code { color: #d5d9e1; background: #292e38; }
+    html[data-theme="dark"] .execution-placeholder { border-color: #444a56; background: rgba(34,38,47,.78); }
+    html[data-theme="dark"] .attachment-chip,
+    html[data-theme="dark"] .message-file { color: #c7cbd3; border-color: #383e49; background: #242832; }
+    html[data-theme="dark"] .folder-picker { border-color: #4a515e; }
+    html[data-theme="dark"] input,
+    html[data-theme="dark"] textarea { caret-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -599,6 +679,7 @@
         <div class="topbar-center">
           <div class="capacity-pill"><span class="live-dot"></span><span id="capacityPill">6 个 Agent 正在工作 · 4 个等待</span></div>
         </div>
+        <button class="btn theme-toggle" id="themeToggleButton" type="button" title="切换深色模式" aria-label="切换深色模式"><span class="theme-icon-dark" aria-hidden="true">☾</span><span class="theme-icon-light" aria-hidden="true">☀</span></button>
         <button class="environment-pill" id="environmentStatus" type="button" title="检查本地运行环境">浏览器演示</button>
       </header>
 
@@ -677,6 +758,7 @@
         <span class="card-id" id="drawerId">AGT-1042</span>
         <span class="status-chip running" id="drawerStatus"><span class="chip-dot"></span>运行中</span>
         <div class="drawer-actions">
+          <button class="btn primary" id="convertTodo" type="button">交给 Codex</button>
           <button class="btn" id="completeTask" type="button">演示完成</button>
           <button class="btn" id="retryTask" type="button">重试任务</button>
           <button class="btn danger" id="stopTask" type="button">停止任务</button>
@@ -705,9 +787,16 @@
 
   <div class="modal-scrim" id="newTaskModal">
     <form class="modal" id="newTaskForm">
-      <h2>新建 AI 任务</h2>
-      <p>每张卡片对应一个独立、可持续续聊的本地 Codex 会话。</p>
+      <h2 id="newTaskTitle">添加任务卡片</h2>
+      <p id="newTaskDescription">选择只记录待办，或立即交给 Codex 执行。</p>
       <input id="taskGroupId" type="hidden" value="commerce" />
+      <div class="field">
+        <label>卡片类型</label>
+        <div class="task-kind-options">
+          <label class="task-kind-option"><input type="radio" name="taskKind" value="todo" /><span><strong>记录待办</strong>保存到看板，不启动 Codex、不占执行槽位。</span></label>
+          <label class="task-kind-option"><input type="radio" name="taskKind" value="codex" checked /><span><strong>发送给 Codex</strong>创建独立会话，立即运行或进入队列。</span></label>
+        </div>
+      </div>
       <div class="field">
         <label for="taskGroupInput">Session 分组</label>
         <input id="taskGroupInput" readonly />
@@ -717,9 +806,9 @@
         <input id="taskTitleInput" required maxlength="60" placeholder="例如：检查支付模块的并发安全" />
       </div>
       <div class="field">
-        <label for="taskPromptInput">第一条指令</label>
+        <label for="taskPromptInput" id="taskPromptLabel">第一条指令</label>
         <textarea id="taskPromptInput" required placeholder="写清楚目标、范围和你希望看到的结果……"></textarea>
-        <div class="field-attachment-row">
+        <div class="field-attachment-row" id="taskAttachmentControls">
           <button class="attach-button" id="taskAttachButton" type="button">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m8 12 5.5-5.5a3 3 0 0 1 4.2 4.2L10 18.4a5 5 0 0 1-7.1-7.1l8-8"/></svg>
             添加本地文件
@@ -729,7 +818,7 @@
         </div>
         <div class="attachment-tray" id="taskAttachmentTray"></div>
       </div>
-      <div class="field">
+      <div class="field" id="taskRepoField">
         <label for="taskRepoInput">关联的本地文件夹</label>
         <input id="taskRepoInput" readonly />
       </div>
@@ -878,6 +967,7 @@
     let followupFiles = [];
     let currentView = localStorage.getItem('agent-linear-current-view') === 'schedule' ? 'schedule' : 'board';
     let soundEnabled = localStorage.getItem('agent-linear-sound-enabled') !== 'false';
+    let themePreference = localStorage.getItem('agent-linear-theme') || 'system';
     let pendingCreateFolder = null;
     let pendingEditFolder = null;
     let removeGroupArmed = false;
@@ -903,7 +993,7 @@
         const savedTasks = state?.version === APP_DATA_VERSION && Array.isArray(state.tasks) ? state.tasks : legacy ? JSON.parse(legacy) : null;
         restoredFromStorage = Boolean(savedTasks);
         const loaded = savedTasks || structuredClone(initialTasks);
-        const normalized = loaded.map(task => ({ ...task, group:task.group || inferGroup(task.repo) }));
+        const normalized = loaded.map(task => ({ ...task, taskKind:task.taskKind || 'codex', group:task.group || inferGroup(task.repo) }));
         const recovered = restoredFromStorage ? normalized.map(task => task.status === 'running' ? { ...task, recoveryPending:true, elapsed:'等待恢复', summary:'应用重新打开，等待用户恢复本地 Session。' } : task) : normalized;
         return normalizeQueueOrders(recovered);
       } catch {
@@ -940,12 +1030,13 @@
         : task.status === 'failed' ? '执行失败'
         : task.status === 'interrupted' ? '异常中断'
         : task.status === 'running' ? '运行中'
+        : task.taskKind === 'todo' && task.status === 'draft' ? '待处理'
         : task.status;
       return {
         ...task,
         group:task.groupId,
         repo:task.cwd,
-        branch:task.sessionId ? `Session ${task.sessionId.slice(0, 8)}` : '正在创建 Session',
+        branch:task.taskKind === 'todo' ? '仅记录' : task.sessionId ? `Session ${task.sessionId.slice(0, 8)}` : '正在创建 Session',
         queueOrder:task.queuePosition,
         time:formatDesktopTime(task.createdAt),
         elapsed,
@@ -1075,7 +1166,7 @@
     function cardTemplate(task) {
       const isQueued = task.status === 'queued';
       const displayClass = task.recoveryPending ? 'recovering' : task.status;
-      const displayLabel = task.recoveryPending ? '等待恢复' : statusLabel(task.status);
+      const displayLabel = task.recoveryPending ? '等待恢复' : task.taskKind === 'todo' && task.status === 'draft' ? '待办' : statusLabel(task.status);
       return `
         <article class="task-card ${task.status} ${task.justCompleted ? 'just-completed' : ''}" data-id="${task.id}" tabindex="0">
           ${task.status === 'running' && !task.recoveryPending ? '<span class="running-bar"></span>' : ''}
@@ -1089,7 +1180,7 @@
           ${((task.status === 'running' && !task.recoveryPending) || task.status === 'queued') ? `<div class="card-progress"><span style="width:${task.progress}%"></span></div>` : ''}
           <div class="card-footer">
             <span class="repo-badge">${icons.repo}<span>${escapeHtml(task.repo)}</span></span>
-            <span class="turn-count">${task.turns} 轮对话</span>
+            <span class="turn-count">${task.taskKind === 'todo' ? '仅记录' : `${task.turns} 轮对话`}</span>
           </div>
         </article>`;
     }
@@ -1099,6 +1190,7 @@
       selectedTaskId = id;
       const task = tasks.find(t => t.id === id);
       if (!task) return;
+      const isTodo = task.taskKind === 'todo';
       if (task.unreadCompletion) {
         task.unreadCompletion = false;
         task.justCompleted = false;
@@ -1109,17 +1201,20 @@
       document.getElementById('drawerTitle').textContent = task.title;
       const status = document.getElementById('drawerStatus');
       status.className = `status-chip ${task.recoveryPending ? 'recovering' : task.status}`;
-      status.innerHTML = `<span class="chip-dot"></span>${task.recoveryPending ? '等待恢复' : statusLabel(task.status)}`;
+      status.innerHTML = `<span class="chip-dot"></span>${task.recoveryPending ? '等待恢复' : isTodo && task.status === 'draft' ? '待办' : statusLabel(task.status)}`;
       document.getElementById('drawerMeta').innerHTML = `<span>${icons.repo}${escapeHtml(task.repo)}</span><span>${icons.branch}${escapeHtml(task.branch)}</span><span>${icons.clock}${escapeHtml(task.elapsed)}</span>`;
       document.getElementById('contextNote').textContent = `已载入 ${task.turns} 轮上下文`;
       const actions = taskStates[task.status]?.actions || [];
-      document.getElementById('completeTask').style.display = !desktopMode && task.status === 'running' && !task.recoveryPending ? 'inline-flex' : 'none';
+      document.getElementById('completeTask').style.display = (isTodo && task.status === 'draft') || (!desktopMode && task.status === 'running' && !task.recoveryPending) ? 'inline-flex' : 'none';
+      document.getElementById('completeTask').textContent = isTodo ? '标记完成' : '演示完成';
+      document.getElementById('convertTodo').style.display = isTodo && task.status === 'draft' ? 'inline-flex' : 'none';
       const stopButton = document.getElementById('stopTask');
-      stopButton.style.display = actions.includes('stop') || actions.includes('cancel') ? 'inline-flex' : 'none';
+      stopButton.style.display = isTodo && task.status === 'draft' || !isTodo && (actions.includes('stop') || actions.includes('cancel')) ? 'inline-flex' : 'none';
       stopButton.textContent = task.status === 'queued' ? '取消排队' : task.status === 'running' ? '停止任务' : '取消任务';
-      document.getElementById('retryTask').style.display = actions.includes('retry') || task.recoveryPending ? 'inline-flex' : 'none';
+      document.getElementById('retryTask').style.display = !isTodo && (actions.includes('retry') || task.recoveryPending) ? 'inline-flex' : 'none';
       document.getElementById('retryTask').textContent = task.recoveryPending ? '恢复任务' : '重试任务';
       document.getElementById('continueTask').textContent = task.status === 'draft' ? '运行' : '继续';
+      document.querySelector('.composer').classList.toggle('is-hidden', isTodo);
       renderConversation(task, options);
       document.getElementById('taskDrawer').classList.add('open');
       document.getElementById('drawerScrim').classList.add('open');
@@ -1127,6 +1222,13 @@
     }
 
     function renderConversation(task, options = {}) {
+      if (task.taskKind === 'todo') {
+        const description = task.prompt || task.summary || '没有补充说明。';
+        const stateText = task.status === 'done' ? '这项待办已完成。' : task.status === 'canceled' ? '这项待办已取消。' : '这是一张仅记录待办，不会发送给 Codex。';
+        const conversation = document.getElementById('conversation');
+        conversation.innerHTML = `<div class="message user"><div class="avatar">✓</div><div class="bubble"><p>${escapeHtml(description)}</p><div class="message-time">${escapeHtml(stateText)}</div></div></div>`;
+        return;
+      }
       const messages = task.messages?.length ? task.messages.map(message => {
         const isAgent = message.role === 'assistant';
         return `<div class="message ${isAgent ? 'agent' : 'user'}"><div class="avatar">${isAgent ? 'AL' : '我'}</div><div class="bubble"><p>${escapeHtml(message.content)}</p>${messageAttachments(message.attachments)}<div class="message-time">${isAgent ? 'Agent Linear · ' : ''}${formatDesktopTime(message.createdAt)}</div></div></div>`;
@@ -1206,6 +1308,26 @@
       toast(soundEnabled ? '声音提醒已开启' : '已静音', soundEnabled ? '任务完成时会播放短提示音。' : '任务仍会高亮，但不会播放声音。');
     }
 
+    function resolvedTheme() {
+      return themePreference === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : themePreference;
+    }
+
+    function applyTheme() {
+      const theme = resolvedTheme();
+      document.documentElement.dataset.theme = theme;
+      const button = document.getElementById('themeToggleButton');
+      button.setAttribute('aria-label', theme === 'dark' ? '切换浅色模式' : '切换深色模式');
+      button.title = theme === 'dark' ? '切换浅色模式' : '切换深色模式';
+    }
+
+    function toggleTheme() {
+      themePreference = resolvedTheme() === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('agent-linear-theme', themePreference);
+      applyTheme();
+    }
+
     function playCompletionSound() {
       if (!soundEnabled) return false;
       try {
@@ -1234,21 +1356,59 @@
       return true;
     }
 
-    function completeSelectedTask() {
+    async function completeSelectedTask() {
       const task = tasks.find(item => item.id === selectedTaskId);
+      if (task?.taskKind === 'todo' && desktopMode) {
+        try {
+          await window.agentLinear.tasks.completeTodo(task.id);
+          closeDrawer();
+          await hydrateDesktopState();
+          toast('待办已完成', `“${task.title}”已保留在看板中。`);
+        } catch (failure) {
+          toast('无法完成待办', failure instanceof Error ? failure.message : String(failure));
+        }
+        return;
+      }
       if (!task || !transitionTask(task, 'done', {
         elapsed:`完成于 ${new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`,
         progress:100,
-        summary:'任务已完成，最终交付等待查看。',
-        finalResult:'已完成本轮任务。代码修改、验证结果和后续建议已经整理完毕。',
+        summary:task.taskKind === 'todo' ? '待办已完成。' : '任务已完成，最终交付等待查看。',
+        finalResult:task.taskKind === 'todo' ? '' : '已完成本轮任务。代码修改、验证结果和后续建议已经整理完毕。',
         justCompleted:true,
         unreadCompletion:true,
         completionNotified:false
       })) return;
       closeDrawer();
-      promoteNextTask();
+      if (task.taskKind !== 'todo') promoteNextTask();
       render();
-      notifyCompletion(task);
+      if (task.taskKind === 'todo') toast('待办已完成', `“${task.title}”已保留在看板中。`);
+      else notifyCompletion(task);
+    }
+
+    async function convertSelectedTodo() {
+      const task = tasks.find(item => item.id === selectedTaskId);
+      if (!task || task.taskKind !== 'todo' || task.status !== 'draft') return;
+      if (desktopMode) {
+        try {
+          await window.agentLinear.tasks.convertTodo(task.id);
+          await hydrateDesktopState();
+          openDrawer(task.id, { bottom:true });
+          const converted = tasks.find(item => item.id === task.id);
+          toast(converted?.status === 'queued' ? '任务已加入队列' : '任务已交给 Codex', converted?.status === 'queued' ? '当前执行槽位已满，原卡片正在队列中等待。' : '原待办卡片已开始执行。');
+        } catch (failure) {
+          toast('无法交给 Codex', failure instanceof Error ? failure.message : String(failure));
+        }
+        return;
+      }
+      task.taskKind = 'codex';
+      task.prompt = task.prompt.trim() || `请完成这项任务：${task.title}`;
+      task.turns = 1;
+      task.branch = 'main';
+      task.summary = '任务已从待办转换，正在准备本地 Codex 会话。';
+      scheduleTask(task);
+      render();
+      openDrawer(task.id, { bottom:true });
+      toast(task.status === 'queued' ? '任务已加入队列' : '任务已交给 Codex', task.status === 'queued' ? '当前执行槽位已满，原卡片正在队列中等待。' : '原待办卡片已开始执行。');
     }
 
     function requestStopSelectedTask() {
@@ -1391,6 +1551,7 @@
       event.preventDefault();
       const groupId = document.getElementById('taskGroupId').value;
       const group = groups.find(item => item.id === groupId);
+      const taskKind = document.querySelector('input[name="taskKind"]:checked')?.value || 'codex';
       const title = document.getElementById('taskTitleInput').value.trim();
       const prompt = document.getElementById('taskPromptInput').value.trim();
       const error = document.getElementById('taskFormError');
@@ -1403,39 +1564,42 @@
         document.getElementById('taskTitleInput').focus();
         return;
       }
-      if (!prompt) {
+      if (taskKind === 'codex' && !prompt) {
         error.textContent = '请填写第一条指令。';
         document.getElementById('taskPromptInput').focus();
         return;
       }
       if (desktopMode) {
         try {
-          const created = await window.agentLinear.tasks.create({ groupId, title, prompt, attachmentPaths:newTaskFiles.map(file => file.path) });
+          const created = taskKind === 'todo'
+            ? await window.agentLinear.tasks.createTodo({ groupId, title, description:prompt })
+            : await window.agentLinear.tasks.create({ groupId, title, prompt, attachmentPaths:newTaskFiles.map(file => file.path) });
           closeModal();
           await hydrateDesktopState();
           openDrawer(created.id, { bottom:true });
-          toast('任务已启动', '已创建真实 Codex 会话，正在后台静默执行。');
+          toast(taskKind === 'todo' ? '待办已记录' : '任务已启动', taskKind === 'todo' ? '没有启动 Codex，也不会占用执行槽位。' : '已创建真实 Codex 会话，正在后台静默执行。');
         } catch (failure) {
           error.textContent = failure instanceof Error ? failure.message : String(failure);
         }
         return;
       }
       const runningCount = activeRunningCount();
-      const status = runningCount < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
+      const status = taskKind === 'todo' ? 'draft' : runningCount < MAX_CONCURRENT_TASKS ? 'running' : 'queued';
       const maxId = tasks.reduce((max, task) => Math.max(max, Number(task.id.split('-')[1]) || 0), 1051);
       const task = {
         id:`AGT-${maxId + 1}`,
+        taskKind,
         status,
         group:groupId,
         title,
-        summary: status === 'running' ? '本地会话已创建，正在静默执行第一轮指令。' : '并发槽位已满，任务按创建顺序等待执行。',
+        summary: taskKind === 'todo' ? prompt || '待办已记录，尚未完成。' : status === 'running' ? '本地会话已创建，正在静默执行第一轮指令。' : '并发槽位已满，任务按创建顺序等待执行。',
         repo:group.path,
-        branch:'main',
+        branch:taskKind === 'todo' ? '仅记录' : 'main',
         time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}),
-        elapsed: status === 'running' ? '00:01' : '等待 00:01',
+        elapsed: taskKind === 'todo' ? '待处理' : status === 'running' ? '00:01' : '等待 00:01',
         progress: status === 'running' ? 2 : 0,
         ...(status === 'queued' ? { queueOrder:nextQueueOrder() } : {}),
-        turns:1,
+        turns:taskKind === 'todo' ? 0 : 1,
         prompt,
         attachments:newTaskFiles.map(serializeFile),
         reply:''
@@ -1444,7 +1608,7 @@
       closeModal();
       render();
       openDrawer(task.id, { bottom:true });
-      toast(status === 'running' ? '任务已启动' : '任务已加入队列', status === 'running' ? '已创建独立 Codex 会话。' : '当前 6 个执行槽位均被占用。');
+      toast(taskKind === 'todo' ? '待办已记录' : status === 'running' ? '任务已启动' : '任务已加入队列', taskKind === 'todo' ? '没有启动 Codex，也不会占用执行槽位。' : status === 'running' ? '已创建独立 Codex 会话。' : '当前 6 个执行槽位均被占用。');
     }
 
     function openModal(groupId = groups[0]?.id) {
@@ -1470,7 +1634,22 @@
       document.getElementById('taskGroupInput').value = '';
       document.getElementById('taskRepoInput').value = '';
       document.getElementById('taskFormError').textContent = '';
+      document.querySelector('input[name="taskKind"][value="codex"]').checked = true;
+      updateTaskKindForm();
       renderAttachmentTray('taskAttachmentTray', newTaskFiles, 'task');
+    }
+
+    function updateTaskKindForm() {
+      const isTodo = document.querySelector('input[name="taskKind"]:checked')?.value === 'todo';
+      const prompt = document.getElementById('taskPromptInput');
+      document.getElementById('taskPromptLabel').textContent = isTodo ? '待办说明（可选）' : '第一条指令';
+      prompt.required = !isTodo;
+      prompt.placeholder = isTodo ? '补充背景、验收标准或截止信息……' : '写清楚目标、范围和你希望看到的结果……';
+      document.getElementById('taskAttachmentControls').classList.toggle('is-hidden', isTodo);
+      document.getElementById('taskAttachmentTray').classList.toggle('is-hidden', isTodo);
+      document.getElementById('taskRepoField').classList.toggle('is-hidden', isTodo);
+      document.getElementById('createTaskButton').textContent = isTodo ? '记录待办' : '创建并运行';
+      document.getElementById('newTaskDescription').textContent = isTodo ? '保存到当前分组，不会启动 Codex。' : '创建独立 Codex 会话，立即运行或按顺序排队。';
     }
 
     function openEditGroup(groupId) {
@@ -1817,14 +1996,17 @@
     document.getElementById('createFolderButton').addEventListener('click', () => chooseFolder('create'));
     document.getElementById('editFolderButton').addEventListener('click', () => chooseFolder('edit'));
     document.getElementById('soundToggleButton').addEventListener('click', toggleSound);
+    document.getElementById('themeToggleButton').addEventListener('click', toggleTheme);
     document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
     document.getElementById('stopTask').addEventListener('click', requestStopSelectedTask);
     document.getElementById('completeTask').addEventListener('click', completeSelectedTask);
+    document.getElementById('convertTodo').addEventListener('click', convertSelectedTodo);
     document.getElementById('retryTask').addEventListener('click', retrySelectedTask);
     document.getElementById('continueTask').addEventListener('click', continueSelectedTask);
     document.getElementById('cancelNewTask').addEventListener('click', closeModal);
     document.getElementById('newTaskModal').addEventListener('click', event => { if (event.target.id === 'newTaskModal') closeModal(); });
     document.getElementById('newTaskForm').addEventListener('submit', createTask);
+    document.querySelectorAll('input[name="taskKind"]').forEach(input => input.addEventListener('change', updateTaskKindForm));
     document.getElementById('cancelEditGroup').addEventListener('click', closeEditGroup);
     document.getElementById('editGroupModal').addEventListener('click', event => { if (event.target.id === 'editGroupModal') closeEditGroup(); });
     document.getElementById('editGroupForm').addEventListener('submit', saveGroupRename);
@@ -1849,6 +2031,8 @@
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); closeModal(); closeEditGroup(); closeCreateGroup(); closeConfirmation(); } });
     document.getElementById('followupInput').addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') continueSelectedTask(); });
 
+    applyTheme();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themePreference === 'system') applyTheme(); });
     renderRoadmap();
     render();
     switchView(currentView);

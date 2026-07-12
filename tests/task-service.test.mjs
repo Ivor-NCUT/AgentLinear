@@ -73,6 +73,47 @@ test('persists a first turn, Session ID, run and final answer', async () => {
   }
 });
 
+test('persists a todo without creating a Codex Session or consuming the scheduler', async () => {
+  const context = await fixture([]);
+  try {
+    const todo = context.service.createTodo({ groupId:context.group.id, title:'Review copy', description:'Check the launch page' });
+    assert.equal(todo.taskKind, 'todo');
+    assert.equal(todo.status, 'draft');
+    assert.equal(todo.turns, 0);
+    assert.equal(todo.prompt, 'Check the launch page');
+    assert.equal(context.calls.length, 0);
+    assert.equal(context.scheduler.runningCount(), 0);
+    assert.equal(context.storage.database.prepare('SELECT COUNT(*) AS count FROM sessions WHERE task_id = ?').get(todo.id).count, 0);
+
+    const completed = context.service.completeTodo(todo.id);
+    assert.equal(completed.status, 'done');
+    assert.equal(completed.summary, '待办已完成。');
+  } finally {
+    cleanup(context);
+  }
+});
+
+test('converts a todo in place and executes it as a Codex task', async () => {
+  const context = await fixture([{ sessionId:'thread-converted', finalOutput:'converted result', exitCode:0, stderr:'', usage:{} }]);
+  try {
+    const todo = context.service.createTodo({ groupId:context.group.id, title:'Ship release', description:'Run the release checklist' });
+    const converted = context.service.convertTodo(todo.id);
+    assert.equal(converted.id, todo.id);
+    assert.equal(converted.taskKind, 'codex');
+    assert.equal(converted.status, 'running');
+    assert.equal(converted.turns, 1);
+    assert.equal(converted.messages[0].content, 'Run the release checklist');
+    await context.scheduler.waitForIdle();
+    const completed = context.service.get(todo.id);
+    assert.equal(completed.status, 'done');
+    assert.equal(completed.sessionId, 'thread-converted');
+    assert.equal(context.calls.length, 1);
+    assert.equal(context.calls[0].prompt, 'Run the release checklist');
+  } finally {
+    cleanup(context);
+  }
+});
+
 test('resumes the same Codex Session and appends immutable history', async () => {
   const context = await fixture([
     { sessionId:'thread-1', finalOutput:'remembered', exitCode:0, stderr:'', usage:{} },

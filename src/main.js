@@ -90,6 +90,13 @@ function registerIpcHandlers() {
     prompt: input?.prompt,
     attachmentPaths: Array.isArray(input?.attachmentPaths) ? input.attachmentPaths : []
   }));
+  ipcMain.handle('tasks:create-todo', (_event, input) => taskService.createTodo({
+    groupId: String(input?.groupId || ''),
+    title: input?.title,
+    description: input?.description
+  }));
+  ipcMain.handle('tasks:complete-todo', (_event, id) => taskService.completeTodo(String(id || '')));
+  ipcMain.handle('tasks:convert-todo', (_event, id) => taskService.convertTodo(String(id || '')));
   ipcMain.handle('tasks:followup', (_event, input) => taskService.followup({
     taskId: String(input?.taskId || ''),
     prompt: input?.prompt,
@@ -107,7 +114,7 @@ function closeResources() {
   if (resourcesClosed) return;
   resourcesClosed = true;
   ipcMain.removeHandler('environment:check');
-  for (const channel of ['recovery:report', 'folders:pick', 'files:pick', 'groups:list', 'groups:create', 'groups:update', 'groups:remove', 'tasks:list', 'tasks:get', 'tasks:create', 'tasks:followup', 'tasks:stop', 'tasks:retry', 'tasks:remove-attachment']) {
+  for (const channel of ['recovery:report', 'folders:pick', 'files:pick', 'groups:list', 'groups:create', 'groups:update', 'groups:remove', 'tasks:list', 'tasks:get', 'tasks:create', 'tasks:create-todo', 'tasks:complete-todo', 'tasks:convert-todo', 'tasks:followup', 'tasks:stop', 'tasks:retry', 'tasks:remove-attachment']) {
     ipcMain.removeHandler(channel);
   }
   storage?.close();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light" />
+  <meta name="color-scheme" content="light dark" />
   <title>Agent Linear · 多线程 AI 协作看板</title>
   <style>
     :root {
@@ -553,6 +553,23 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
     }
+
+    .theme-toggle { width: 34px; padding: 0; font-size: 16px; }
+    .theme-toggle .theme-icon-light { display: none; }
+    html[data-theme="dark"] { color-scheme: dark; --bg:#111318; --surface:#1b1e25; --surface-soft:#22262f; --ink:#f0f1f3; --muted:#a4a9b3; --faint:#737986; --line:#2b303a; --line-strong:#383e49; --accent:#8791f4; --accent-soft:#292d4b; --green:#67c99a; --green-soft:#19372b; --amber:#e2ad56; --amber-soft:#3a2e19; --red:#ef8585; --red-soft:#3b2226; --shadow-panel:0 24px 70px rgba(0,0,0,.48),0 2px 8px rgba(0,0,0,.3); --shadow-card:0 1px 2px rgba(0,0,0,.28); }
+    html[data-theme="dark"] .theme-icon-dark { display:none; } html[data-theme="dark"] .theme-icon-light { display:inline; }
+    html[data-theme="dark"] .sidebar { background:#171a20; }
+    html[data-theme="dark"] .workspace-switcher,html[data-theme="dark"] .resource-meter,html[data-theme="dark"] .column-head,html[data-theme="dark"] .phase-card,html[data-theme="dark"] .board-empty { background:rgba(34,38,47,.72); }
+    html[data-theme="dark"] .workspace-avatar,html[data-theme="dark"] .avatar { background:#343946;color:var(--ink); }
+    html[data-theme="dark"] .nav-item { color:var(--muted); } html[data-theme="dark"] .nav-item:hover { background:rgba(255,255,255,.055); } html[data-theme="dark"] .nav-item.active { background:#242832; }
+    html[data-theme="dark"] .meter,html[data-theme="dark"] .column-count,html[data-theme="dark"] .card-progress { background:#343945; }
+    html[data-theme="dark"] .topbar { background:rgba(27,30,37,.88); } html[data-theme="dark"] .capacity-pill { color:#b7bdff;border-color:#3b416b; }
+    html[data-theme="dark"] .environment-pill.ready { border-color:#315d49; } html[data-theme="dark"] .environment-pill.error,html[data-theme="dark"] .btn.danger,html[data-theme="dark"] .message-file.missing { border-color:#63363d; }
+    html[data-theme="dark"] .btn:hover,html[data-theme="dark"] .group-menu:hover { background:#292d36;border-color:#4a515e; } html[data-theme="dark"] .btn.primary:hover { background:#7580e8; }
+    html[data-theme="dark"] .task-card:hover { border-color:#4a515e;box-shadow:0 7px 20px rgba(0,0,0,.24); } html[data-theme="dark"] .task-card.running { background:#20232c; } html[data-theme="dark"] .task-card.queued,html[data-theme="dark"] .task-card.interrupted { background:#262319; } html[data-theme="dark"] .task-card.failed { background:#292024; }
+    html[data-theme="dark"] .freeze-note { color:#e5b96b;border-color:#5d4928;background:#302817; } html[data-theme="dark"] .schedule-table th { background:#22262f; } html[data-theme="dark"] .schedule-table tbody tr:hover { background:#20242c; } html[data-theme="dark"] .phase-badge { color:#b8bdc7;background:#303540; } html[data-theme="dark"] .schedule-footnote { color:#b7bdff;border-color:#3b416b; }
+    html[data-theme="dark"] .drawer-scrim,html[data-theme="dark"] .modal-scrim { background:rgba(0,0,0,.58); } html[data-theme="dark"] .conversation { background:#15181e; } html[data-theme="dark"] .message.user .bubble { border-color:#4b5262;background:#3b4050; } html[data-theme="dark"] .bubble code { color:#d5d9e1;background:#292e38; } html[data-theme="dark"] .execution-placeholder { border-color:#444a56;background:rgba(34,38,47,.78); }
+    html[data-theme="dark"] .attachment-chip,html[data-theme="dark"] .message-file { color:#c7cbd3;border-color:#383e49;background:#242832; } html[data-theme="dark"] .folder-picker { border-color:#4a515e; } html[data-theme="dark"] input,html[data-theme="dark"] textarea { caret-color:var(--accent); }
   </style>
 </head>
 <body>
@@ -599,6 +616,7 @@
         <div class="topbar-center">
           <div class="capacity-pill"><span class="live-dot"></span><span id="capacityPill">6 个 Agent 正在工作 · 4 个等待</span></div>
         </div>
+        <button class="btn theme-toggle" id="themeToggleButton" type="button" title="切换深色模式" aria-label="切换深色模式"><span class="theme-icon-dark" aria-hidden="true">☾</span><span class="theme-icon-light" aria-hidden="true">☀</span></button>
         <button class="environment-pill" id="environmentStatus" type="button" title="检查本地运行环境">浏览器演示</button>
       </header>
 
@@ -878,6 +896,7 @@
     let followupFiles = [];
     let currentView = localStorage.getItem('agent-linear-recruiting-demo-current-view') === 'schedule' ? 'schedule' : 'board';
     let soundEnabled = localStorage.getItem('agent-linear-recruiting-demo-sound-enabled') !== 'false';
+    let themePreference = localStorage.getItem('agent-linear-theme') || 'system';
     let pendingCreateFolder = null;
     let pendingEditFolder = null;
     let removeGroupArmed = false;
@@ -1205,6 +1224,10 @@
       render();
       toast(soundEnabled ? '声音提醒已开启' : '已静音', soundEnabled ? '任务完成时会播放短提示音。' : '任务仍会高亮，但不会播放声音。');
     }
+
+    function resolvedTheme() { return themePreference === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : themePreference; }
+    function applyTheme() { const theme=resolvedTheme(); document.documentElement.dataset.theme=theme; const button=document.getElementById('themeToggleButton'); button.setAttribute('aria-label',theme==='dark'?'切换浅色模式':'切换深色模式'); button.title=theme==='dark'?'切换浅色模式':'切换深色模式'; }
+    function toggleTheme() { themePreference=resolvedTheme()==='dark'?'light':'dark'; localStorage.setItem('agent-linear-theme',themePreference); applyTheme(); }
 
     function playCompletionSound() {
       if (!soundEnabled) return false;
@@ -1815,6 +1838,7 @@
     document.getElementById('createFolderButton').addEventListener('click', () => chooseFolder('create'));
     document.getElementById('editFolderButton').addEventListener('click', () => chooseFolder('edit'));
     document.getElementById('soundToggleButton').addEventListener('click', toggleSound);
+    document.getElementById('themeToggleButton').addEventListener('click', toggleTheme);
     document.getElementById('drawerScrim').addEventListener('click', closeDrawer);
     document.getElementById('stopTask').addEventListener('click', requestStopSelectedTask);
     document.getElementById('completeTask').addEventListener('click', completeSelectedTask);
@@ -1847,6 +1871,8 @@
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDrawer(); closeModal(); closeEditGroup(); closeCreateGroup(); closeConfirmation(); } });
     document.getElementById('followupInput').addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') continueSelectedTask(); });
 
+    applyTheme();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themePreference === 'system') applyTheme(); });
     renderRoadmap();
     render();
     switchView(currentView);

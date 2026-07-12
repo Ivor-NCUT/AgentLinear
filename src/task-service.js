@@ -23,6 +23,12 @@ function taskSummary(status) {
   }[status] || '';
 }
 
+function todoSummary(status, description) {
+  if (status === 'done') return '待办已完成。';
+  if (status === 'canceled') return '待办已取消。';
+  return description || '待办已记录，尚未完成。';
+}
+
 function requiredText(value, label, maxLength) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) throw new Error(`请填写${label}。`);
@@ -94,6 +100,7 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
       id: row.id,
       groupId: row.group_id,
       title: row.title,
+      taskKind: row.task_kind || 'codex',
       status: row.status,
       summary: row.summary || taskSummary(row.status),
       cwd: row.folder_path,
@@ -194,6 +201,74 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
         VALUES (?, ?, ?, 'user', ?, 0, ?)
       `).run(messageId, taskId, sessionId, cleanPrompt, now);
       attachmentService.insertPrepared({ taskId, messageId, files:preparedAttachments });
+      database.exec('COMMIT;');
+    } catch (error) {
+      database.exec('ROLLBACK;');
+      throw error;
+    }
+    const task = requireScheduler().enqueue(taskId);
+    onChanged(task);
+    return get(taskId);
+  }
+
+  function createTodo({ groupId, title, description = '' }) {
+    const cleanTitle = requiredText(title, '待办标题', 120);
+    const cleanDescription = typeof description === 'string' ? description.trim() : '';
+    if (cleanDescription.length > 100_000) throw new Error('待办说明不能超过 100000 个字符。');
+    const group = database.prepare('SELECT id FROM groups WHERE id = ?').get(groupId);
+    if (!group) throw new Error('当前 Session 分组不存在。');
+    const taskId = nextTaskId();
+    const now = timestamp();
+    database.prepare(`
+      INSERT INTO tasks (id, group_id, title, prompt, summary, status, task_kind, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'draft', 'todo', ?, ?)
+    `).run(taskId, groupId, cleanTitle, cleanDescription, todoSummary('draft', cleanDescription), now, now);
+    const task = get(taskId);
+    onChanged(task);
+    return task;
+  }
+
+  function completeTodo(taskId) {
+    const current = get(taskId);
+    if (!current) throw new Error('待办不存在。');
+    if (current.taskKind !== 'todo') throw new Error('只有待办卡片可以直接标记完成。');
+    if (current.status === 'done') return current;
+    if (current.status !== 'draft') throw new Error('这个待办当前不能标记完成。');
+    const now = timestamp();
+    database.prepare(`
+      UPDATE tasks SET status = 'done', summary = ?, updated_at = ?, completed_at = ? WHERE id = ?
+    `).run(todoSummary('done'), now, now, taskId);
+    const task = get(taskId);
+    onChanged(task);
+    return task;
+  }
+
+  function convertTodo(taskId) {
+    const current = get(taskId);
+    if (!current) throw new Error('待办不存在。');
+    if (current.taskKind !== 'todo') throw new Error('这张卡片已经是 Codex 任务。');
+    if (current.status !== 'draft') throw new Error('只有未完成的待办可以交给 Codex。');
+    const group = database.prepare('SELECT folder_path FROM groups WHERE id = ?').get(current.groupId);
+    if (!group) throw new Error('当前 Session 分组不存在。');
+    ensureReady(group.folder_path);
+
+    const prompt = current.prompt.trim() || `请完成这项任务：${current.title}`;
+    const sessionId = randomUUID();
+    const messageId = randomUUID();
+    const now = timestamp();
+    database.exec('BEGIN IMMEDIATE;');
+    try {
+      database.prepare(`
+        UPDATE tasks SET task_kind = 'codex', prompt = ?, summary = ?, updated_at = ? WHERE id = ?
+      `).run(prompt, taskSummary('draft'), now, taskId);
+      database.prepare(`
+        INSERT INTO sessions (id, task_id, cwd, state, created_at, updated_at)
+        VALUES (?, ?, ?, 'new', ?, ?)
+      `).run(sessionId, taskId, group.folder_path, now, now);
+      database.prepare(`
+        INSERT INTO messages (id, task_id, session_id, role, content, turn_index, created_at)
+        VALUES (?, ?, ?, 'user', ?, 0, ?)
+      `).run(messageId, taskId, sessionId, prompt, now);
       database.exec('COMMIT;');
     } catch (error) {
       database.exec('ROLLBACK;');
@@ -382,6 +457,15 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
   function stop(taskId, reason = { kind:'user', message:'用户停止了任务。' }) {
     const task = get(taskId);
     if (!task) throw new Error('任务不存在。');
+    if (task.taskKind === 'todo' && task.status === 'draft') {
+      const now = timestamp();
+      database.prepare(`
+        UPDATE tasks SET status = 'canceled', summary = ?, updated_at = ?, canceled_at = ? WHERE id = ?
+      `).run(todoSummary('canceled'), now, now, taskId);
+      const updated = get(taskId);
+      onChanged(updated);
+      return updated;
+    }
     if (task.status === 'queued') return requireScheduler().cancelQueued(taskId);
     if (task.status !== 'running') throw new Error('只有运行中或排队中的任务可以停止。');
     const normalizedReason = typeof reason === 'object' && reason ? reason : { kind:'user', message:String(reason) };
@@ -439,6 +523,9 @@ export function createTaskService({ database, adapter, ensureReady, onChanged = 
     get,
     migrateLegacySessions,
     create,
+    createTodo,
+    completeTodo,
+    convertTodo,
     followup,
     executeQueued,
     setScheduler,

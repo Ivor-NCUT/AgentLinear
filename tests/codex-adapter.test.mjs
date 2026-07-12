@@ -197,7 +197,7 @@ test('aborting a run terminates the full local process tree', async () => {
   }
 });
 
-test('grants local attachment directories and adds image inputs to Codex', async () => {
+test('uses full local access and adds image inputs to Codex', async () => {
   let child;
   const adapter = new CodexAdapter({ spawnProcess(_executable, receivedArgs) {
     assert.deepEqual(receivedArgs, ['app-server','--stdio']);
@@ -213,17 +213,17 @@ test('grants local attachment directories and adds image inputs to Codex', async
     ]
   });
   const turn = child.requests.find(request => request.method === 'turn/start').params;
-  assert.deepEqual(turn.sandboxPolicy.writableRoots, ['/workspace','/outside/docs','/outside/images']);
+  assert.deepEqual(turn.sandboxPolicy, { type:'dangerFullAccess' });
   assert.equal(turn.input.some(input => input.type === 'localImage' && input.path === '/outside/images/screen.png'), true);
   assert.match(turn.input[0].text, /agentlinear_attachments/);
   assert.match(turn.input[0].text, /\/outside\/docs\/notes\.md/);
 });
 
-test('builds a workspace-write turn without special cases for an empty attachment list', () => {
+test('builds a full-access turn without special cases for an empty attachment list', () => {
   assert.deepEqual(buildAppServerTurn({ cwd:'/workspace', prompt:'work' }), {
     input:[{ type:'text', text:'work' }],
     cwd:'/workspace',
     approvalPolicy:'never',
-    sandboxPolicy:{ type:'workspaceWrite', writableRoots:['/workspace'], networkAccess:false }
+    sandboxPolicy:{ type:'dangerFullAccess' }
   });
 });

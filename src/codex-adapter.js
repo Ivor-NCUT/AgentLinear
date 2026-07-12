@@ -6,7 +6,6 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import path from 'node:path';
 
 const MAX_STDERR_LENGTH = 256 * 1024;
 const CLIENT_INFO = { name:'agentlinear', title:'AgentLinear', version:'0.1.0' };
@@ -30,12 +29,7 @@ function promptWithAttachments(prompt, attachments) {
   return `${prompt}\n\n<agentlinear_attachments>\nThe user attached these local files. Read them from their absolute paths when relevant:\n${JSON.stringify(manifest, null, 2)}\n</agentlinear_attachments>`;
 }
 
-function writableRoots(cwd, attachments) {
-  return [...new Set([cwd, ...attachments.map(file => path.dirname(file.path))])];
-}
-
 export function buildAppServerTurn({ cwd, prompt, attachments = [] }) {
-  const roots = writableRoots(cwd, attachments);
   const input = [{ type:'text', text:promptWithAttachments(prompt, attachments) }];
   for (const file of attachments) {
     if (file.mimeType?.startsWith('image/')) input.push({ type:'localImage', path:file.path });
@@ -44,7 +38,7 @@ export function buildAppServerTurn({ cwd, prompt, attachments = [] }) {
     input,
     cwd,
     approvalPolicy:'never',
-    sandboxPolicy:{ type:'workspaceWrite', writableRoots:roots, networkAccess:false }
+    sandboxPolicy:{ type:'dangerFullAccess' }
   };
 }
 
@@ -208,12 +202,12 @@ export class CodexAdapter {
                 threadId:sessionId,
                 cwd,
                 approvalPolicy:'never',
-                sandbox:'workspace-write'
+                sandbox:'danger-full-access'
               })
             : await request('thread/start', {
                 cwd,
                 approvalPolicy:'never',
-                sandbox:'workspace-write',
+                sandbox:'danger-full-access',
                 threadSource:'agentlinear'
               });
           let shouldNameThread = !sessionId;
@@ -223,7 +217,7 @@ export class CodexAdapter {
               threadId:sessionId,
               cwd,
               approvalPolicy:'never',
-              sandbox:'workspace-write',
+              sandbox:'danger-full-access',
               threadSource:'agentlinear'
             });
             shouldNameThread = true;
