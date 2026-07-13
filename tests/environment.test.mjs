@@ -16,7 +16,7 @@ test('reports a ready local Codex environment', () => {
     ? commandResult(0, 'codex-cli 1.2.3\n')
     : commandResult(0, 'Logged in using ChatGPT\n');
   try {
-    const result = runEnvironmentPreflight({ dataDirectory: root, workspacePath: root, runCommand, nodeVersion: 'v22.16.0' });
+    const result = runEnvironmentPreflight({ dataDirectory: root, workspacePath: root, runCommand, nodeVersion: 'v22.16.0', candidateExecutables:[] });
     assert.equal(result.ok, true);
     assert.equal(result.codexExecutable, 'codex');
     assert.equal(result.checks.length, 6);
@@ -33,7 +33,8 @@ test('returns actionable failures for missing Codex and invalid workspace', () =
       dataDirectory: root,
       workspacePath: path.join(root, 'missing'),
       runCommand,
-      nodeVersion: 'v22.16.0'
+      nodeVersion: 'v22.16.0',
+      candidateExecutables:[]
     });
     assert.equal(result.ok, false);
     assert.match(result.checks.find(check => check.id === 'workspace').action, /文件夹/);
@@ -49,7 +50,7 @@ test('detects an unauthenticated Codex CLI', () => {
     ? commandResult(0, 'codex-cli 1.2.3\n')
     : commandResult(1, '', 'Not logged in');
   try {
-    const result = runEnvironmentPreflight({ dataDirectory: root, runCommand, nodeVersion: 'v23.0.0' });
+    const result = runEnvironmentPreflight({ dataDirectory: root, runCommand, nodeVersion: 'v23.0.0', candidateExecutables:[] });
     const auth = result.checks.find(check => check.id === 'codex-auth');
     assert.equal(result.ok, false);
     assert.match(auth.action, /codex login/);
@@ -64,7 +65,7 @@ test('rejects Node.js versions without sqlite.backup support', () => {
     ? commandResult(0, 'codex-cli 1.2.3\n')
     : commandResult(0, 'Logged in');
   try {
-    const result = runEnvironmentPreflight({ dataDirectory: root, runCommand, nodeVersion: 'v22.15.0' });
+    const result = runEnvironmentPreflight({ dataDirectory: root, runCommand, nodeVersion: 'v22.15.0', candidateExecutables:[] });
     assert.equal(result.ok, false);
     assert.match(result.checks.find(check => check.id === 'node').action, /升级 Node.js/);
   } finally {
@@ -92,6 +93,28 @@ test('gives an explicit Codex path priority over PATH discovery', () => {
   }
 });
 
+test('prefers the desktop Codex candidate over a different CLI on PATH', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlinear-env-'));
+  const desktopCodex = path.join(root, 'ChatGPT.app', 'Contents', 'Resources', 'codex');
+  fs.mkdirSync(path.dirname(desktopCodex), { recursive:true });
+  fs.writeFileSync(desktopCodex, '#!/bin/sh\n');
+  fs.chmodSync(desktopCodex, 0o755);
+  const commands = [];
+  const runCommand = (command, args) => {
+    commands.push(command);
+    if (args[0] === '--version') return commandResult(0, command === desktopCodex ? 'codex-cli desktop\n' : 'codex-cli path\n');
+    return commandResult(0, 'Logged in using ChatGPT\n');
+  };
+  try {
+    const result = runEnvironmentPreflight({ dataDirectory:root, runCommand, candidateExecutables:[desktopCodex] });
+    assert.equal(result.ok, true);
+    assert.equal(result.codexExecutable, desktopCodex);
+    assert.equal(commands.includes('codex'), false);
+  } finally {
+    fs.rmSync(root, { recursive:true, force:true });
+  }
+});
+
 test('rejects a Codex CLI that cannot provide the interactive app-server protocol', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agentlinear-env-'));
   const runCommand = (_command, args) => {
@@ -100,7 +123,7 @@ test('rejects a Codex CLI that cannot provide the interactive app-server protoco
     return commandResult(0, 'Logged in');
   };
   try {
-    const result = runEnvironmentPreflight({ dataDirectory:root, runCommand, nodeVersion:'v22.16.0' });
+    const result = runEnvironmentPreflight({ dataDirectory:root, runCommand, nodeVersion:'v22.16.0', candidateExecutables:[] });
     assert.equal(result.ok, false);
     assert.match(result.checks.find(check => check.id === 'codex-app-server').action, /升级 Codex CLI/);
   } finally {

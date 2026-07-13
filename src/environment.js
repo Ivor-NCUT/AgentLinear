@@ -56,7 +56,7 @@ function executableCandidates(platform = process.platform) {
   return candidates.filter(Boolean);
 }
 
-function locateCodex(runCommand, configuredCodexPath) {
+function locateCodex(runCommand, configuredCodexPath, candidates = executableCandidates()) {
   if (configuredCodexPath) {
     try {
       fs.accessSync(configuredCodexPath, fs.constants.X_OK);
@@ -67,10 +67,7 @@ function locateCodex(runCommand, configuredCodexPath) {
       return { executable:null, probe:{ status:null, stdout:'', stderr:'', error } };
     }
   }
-  const pathProbe = runCommand('codex', ['--version'], { encoding: 'utf8', timeout: 5000 });
-  if (!pathProbe.error && pathProbe.status === 0) return { executable: 'codex', probe: pathProbe };
-
-  for (const candidate of executableCandidates()) {
+  for (const candidate of candidates) {
     try {
       fs.accessSync(candidate, fs.constants.X_OK);
       const probe = runCommand(candidate, ['--version'], { encoding: 'utf8', timeout: 5000 });
@@ -79,6 +76,8 @@ function locateCodex(runCommand, configuredCodexPath) {
       // Continue through known local installation paths.
     }
   }
+  const pathProbe = runCommand('codex', ['--version'], { encoding: 'utf8', timeout: 5000 });
+  if (!pathProbe.error && pathProbe.status === 0) return { executable: 'codex', probe: pathProbe };
   return { executable: null, probe: pathProbe };
 }
 
@@ -104,7 +103,8 @@ export function runEnvironmentPreflight({
   workspacePath = null,
   runCommand = spawnSync,
   nodeVersion = process.version,
-  configuredCodexPath = process.env.AGENTLINEAR_CODEX_PATH || process.env.CODEX_PATH
+  configuredCodexPath = process.env.AGENTLINEAR_CODEX_PATH || process.env.CODEX_PATH,
+  candidateExecutables = executableCandidates()
 }) {
   const checks = [];
   checks.push(versionAtLeast(nodeVersion, MINIMUM_NODE_VERSION)
@@ -114,7 +114,7 @@ export function runEnvironmentPreflight({
   checks.push(checkDirectory('data-directory', dataDirectory, true));
   if (workspacePath) checks.push(checkDirectory('workspace', workspacePath, false));
 
-  const located = locateCodex(runCommand, configuredCodexPath);
+  const located = locateCodex(runCommand, configuredCodexPath, candidateExecutables);
   if (!located.executable) {
     checks.push(failure(
       'codex-cli',
