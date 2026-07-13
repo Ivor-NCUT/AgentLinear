@@ -6,9 +6,19 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
 
 const MAX_STDERR_LENGTH = 256 * 1024;
 const CLIENT_INFO = { name:'agentlinear', title:'AgentLinear', version:'0.1.0' };
+const APP_SERVER_ARGS = ['-c','features.code_mode_host=true','app-server','--stdio'];
+
+export function buildCodexEnvironment(environment = process.env, homeDirectory = os.homedir()) {
+  return {
+    ...environment,
+    CODEX_HOME:environment.CODEX_HOME || path.join(homeDirectory, '.codex')
+  };
+}
 
 export class CodexExecutionError extends Error {
   constructor(message, result, cause) {
@@ -83,9 +93,9 @@ export class CodexAdapter {
     if (!cwd || (!prepareOnly && !prompt?.trim())) throw new Error('Codex 执行需要工作目录和指令。');
 
     return new Promise((resolve, reject) => {
-      const child = this.spawnProcess(executable, ['app-server', '--stdio'], {
+      const child = this.spawnProcess(executable, APP_SERVER_ARGS, {
         cwd,
-        env:process.env,
+        env:buildCodexEnvironment(),
         stdio:['pipe', 'pipe', 'pipe'],
         detached:process.platform !== 'win32',
         windowsHide:true

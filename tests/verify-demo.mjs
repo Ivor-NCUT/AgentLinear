@@ -87,7 +87,8 @@ assert(preload.includes("ipcRenderer.invoke('tasks:retry'"), '预加载脚本缺
 assert(recovery.includes("status = 'interrupted'"), '启动恢复没有标记中断运行');
 assert(recovery.includes('looksLikeCodexProcess'), '启动恢复缺少进程身份校验');
 assert(recovery.includes('lease_token = NULL'), '启动恢复缺少持久队列租约修复');
-assert(codexAdapter.includes("['app-server', '--stdio']"), 'Codex 适配器没有使用交互式 app-server 协议');
+assert(codexAdapter.includes("'features.code_mode_host=true','app-server','--stdio'"), 'Codex 适配器没有对齐桌面端 app-server 能力');
+assert(codexAdapter.includes('CODEX_HOME:environment.CODEX_HOME'), 'Codex 适配器没有复用桌面端 CODEX_HOME');
 assert(codexAdapter.includes("threadSource:'agentlinear'"), 'Codex app-server 线程缺少 AgentLinear 来源标识');
 assert(codexAdapter.includes("type:'dangerFullAccess'"), 'Codex 适配器没有使用本机完整权限');
 assert(codexAdapter.includes("type:'localImage'"), 'Codex app-server 没有传递本地图片输入');

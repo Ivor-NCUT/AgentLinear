@@ -8,7 +8,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { buildAppServerTurn, CodexAdapter, CodexExecutionError } from '../src/codex-adapter.js';
+import { buildAppServerTurn, buildCodexEnvironment, CodexAdapter, CodexExecutionError } from '../src/codex-adapter.js';
+
+const APP_SERVER_ARGS = ['-c','features.code_mode_host=true','app-server','--stdio'];
 
 const fixtureDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,8 +97,9 @@ test('uses app-server to create an interactive session and collect the final out
   assert.equal(result.sessionId, 'thread-1');
   assert.equal(result.finalOutput, 'finished');
   assert.equal(result.usage.outputTokens, 3);
-  assert.deepEqual(invocation.args, ['app-server','--stdio']);
+  assert.deepEqual(invocation.args, APP_SERVER_ARGS);
   assert.equal(invocation.options.cwd, '/tmp/project');
+  assert.equal(invocation.options.env.CODEX_HOME, path.join(os.homedir(), '.codex'));
   assert.deepEqual(invocation.child.requests.map(request => request.method), ['initialize','initialized','thread/start','thread/name/set','turn/start']);
   const threadStart = invocation.child.requests.find(request => request.method === 'thread/start');
   assert.equal(threadStart.params.threadSource, 'agentlinear');
@@ -106,7 +109,7 @@ test('uses app-server to create an interactive session and collect the final out
 test('uses app-server thread/resume for follow-up turns', async () => {
   let child;
   const adapter = new CodexAdapter({ spawnProcess(_executable, receivedArgs) {
-    assert.deepEqual(receivedArgs, ['app-server','--stdio']);
+    assert.deepEqual(receivedArgs, APP_SERVER_ARGS);
     child = fakeAppServer({ output:'continued' });
     return child;
   } });
@@ -200,7 +203,7 @@ test('aborting a run terminates the full local process tree', async () => {
 test('uses full local access and adds image inputs to Codex', async () => {
   let child;
   const adapter = new CodexAdapter({ spawnProcess(_executable, receivedArgs) {
-    assert.deepEqual(receivedArgs, ['app-server','--stdio']);
+    assert.deepEqual(receivedArgs, APP_SERVER_ARGS);
     child = fakeAppServer({ sessionId:'thread-files', output:'read files' });
     return child;
   } });
@@ -225,5 +228,16 @@ test('builds a full-access turn without special cases for an empty attachment li
     cwd:'/workspace',
     approvalPolicy:'never',
     sandboxPolicy:{ type:'dangerFullAccess' }
+  });
+});
+
+test('shares the desktop Codex home without discarding the launch environment', () => {
+  assert.deepEqual(buildCodexEnvironment({ PATH:'/custom/bin', CODEX_HOME:'/custom/codex' }, '/Users/example'), {
+    PATH:'/custom/bin',
+    CODEX_HOME:'/custom/codex'
+  });
+  assert.deepEqual(buildCodexEnvironment({ PATH:'/custom/bin' }, '/Users/example'), {
+    PATH:'/custom/bin',
+    CODEX_HOME:'/Users/example/.codex'
   });
 });
